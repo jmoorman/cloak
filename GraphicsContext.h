@@ -42,6 +42,11 @@ private:
 	VkSemaphore imageAcquiredSemaphore;
 	VkSemaphore renderFinishedSemaphore;
 
+	VkBuffer mVertexBuffer;
+	VkDeviceMemory mVertexBufferMemory;
+	VkBuffer mIndexBuffer;
+	VkDeviceMemory mIndexBufferMemory;
+
 	uint32_t frameCount;
 
 	//Initialization helpers
@@ -54,12 +59,19 @@ private:
 	void createRenderPass();
 	void createGraphicsPipeline();
 	void createFramebuffers();
+	void createVertexBuffer();
+	void createIndexBuffer();
 	void createCommandBuffers();
 	void createSemaphores();
 
 	void createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule);
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 	void setImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout);
+	U32 findMemoryType(U32 typeFilter, VkMemoryPropertyFlags properties);
+
 	bool checkResult(VkResult result);
 	const char *resultToString(VkResult result);
 };
+

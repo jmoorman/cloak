@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <tchar.h>
 
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <string>

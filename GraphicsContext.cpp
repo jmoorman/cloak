@@ -1,5 +1,6 @@
 #include "GraphicsContext.h"
 
+#include "geometry.h"
 #include "OcelotUtils.h"
 
 #define VK_CALL(func_call) { \
@@ -27,6 +28,8 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	createRenderPass();
 	createGraphicsPipeline();
 	createFramebuffers();
+	createVertexBuffer();
+	createIndexBuffer();
 	createCommandBuffers();
 	createSemaphores();
 }
@@ -321,13 +324,15 @@ void GraphicsContext::createGraphicsPipeline()
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
+	VkVertexInputBindingDescription bindingDescription = ScreenVertex::getBindingDescription();
+	std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = ScreenVertex::getAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.size();
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {};
 	inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -453,6 +458,52 @@ void GraphicsContext::createFramebuffers()
 	}
 }
 
+void GraphicsContext::createVertexBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(gDemoVertices[0]) * gDemoVertices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&stagingBuffer, &stagingBufferMemory);
+
+	void *data;
+	vkMapMemory(mDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, gDemoVertices.data(), bufferSize);
+	vkUnmapMemory(mDevice, stagingBufferMemory);
+
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mVertexBuffer, &mVertexBufferMemory);
+
+	copyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
+
+	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
+	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
+}
+
+void GraphicsContext::createIndexBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(gDemoIndices[0]) * gDemoIndices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&stagingBuffer, &stagingBufferMemory);
+
+	void *data;
+	vkMapMemory(mDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, gDemoIndices.data(), bufferSize);
+	vkUnmapMemory(mDevice, stagingBufferMemory);
+
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mIndexBuffer, &mIndexBufferMemory);
+
+	copyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
+
+	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
+	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
+}
+
 void GraphicsContext::createCommandBuffers()
 {
 	VkResult result = VK_SUCCESS;
@@ -488,7 +539,12 @@ void GraphicsContext::createCommandBuffers()
 		vkCmdBeginRenderPass(mCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 		{
 			vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
-			vkCmdDraw(mCommandBuffers[i], 3, 1, 0, 0);
+			
+			VkBuffer vertexBuffers[] = { mVertexBuffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, vertexBuffers, offsets);
+			vkCmdBindIndexBuffer(mCommandBuffers[i], mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdDrawIndexed(mCommandBuffers[i], gDemoIndices.size(), 1, 0, 0, 0);
 		}
 		vkCmdEndRenderPass(mCommandBuffers[i]);
 
@@ -560,6 +616,69 @@ void GraphicsContext::createShaderModule(const std::vector<char>& code, VkShader
 	assert(checkResult(result));
 }
 
+void GraphicsContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut)
+{
+	VkResult result = VK_SUCCESS;
+
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = size;
+	bufferInfo.usage = usage;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	result = vkCreateBuffer(mDevice, &bufferInfo, nullptr, pBufferOut);
+	assert(checkResult(result));
+
+	VkMemoryRequirements memReq;
+	vkGetBufferMemoryRequirements(mDevice, *pBufferOut, &memReq);
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memReq.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, properties);
+
+	//This is bad practice. We should be allocating a large block up-front and managing our own suballocations
+	result = vkAllocateMemory(mDevice, &allocInfo, nullptr, pBufferMemoryOut);
+	assert(checkResult(result));
+
+	vkBindBufferMemory(mDevice, *pBufferOut, *pBufferMemoryOut, 0);
+}
+
+void GraphicsContext::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+{
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = mCommandPool;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(mDevice, &allocInfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	VkBufferCopy copyRegion = {};
+	copyRegion.srcOffset = 0;
+	copyRegion.dstOffset = 0;
+	copyRegion.size = size;
+	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+	vkQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(mQueue);
+
+	vkFreeCommandBuffers(mDevice, mCommandPool, 1, &commandBuffer);
+}
+
 void GraphicsContext::destroy()
 {
 	vkDeviceWaitIdle(mDevice);
@@ -624,6 +743,21 @@ void GraphicsContext::setImageLayout(VkCommandBuffer commandBuffer, VkImage imag
 	VkPipelineStageFlags dstStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
 	vkCmdPipelineBarrier(commandBuffer, srcStageFlags, dstStageFlags, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+}
+
+U32 GraphicsContext::findMemoryType(U32 typeFilter, VkMemoryPropertyFlags properties)
+{
+	VkPhysicalDeviceMemoryProperties memProps;
+	vkGetPhysicalDeviceMemoryProperties(mPhysicalDevice, &memProps);
+	for (U32 i = 0; i < memProps.memoryTypeCount; i++)
+	{
+		if (typeFilter & (1 << i) && ((memProps.memoryTypes[i].propertyFlags & properties) == properties))
+		{
+			return i;
+		}
+	}
+	assert(false);
+	return 0;
 }
 
 bool GraphicsContext::checkResult(VkResult result)
