@@ -4,6 +4,17 @@
 #include "stdafx.h"
 
 #include "GraphicsContext.h"
+#include "Mesh.h"
+
+static Mesh *g_pyramidMesh = nullptr;
+
+void initScene()
+{
+	g_pyramidMesh = new Mesh();
+
+	bool success = g_pyramidMesh->loadFromObj("../data/meshes/pyramid.obj");
+
+}
 
 int main()
 {
@@ -35,8 +46,13 @@ int main()
 	GraphicsContext graphicsContext;
 	graphicsContext.init(GetModuleHandle(NULL), info.info.win.window);
 
+	initScene();
+
+	U32 lastFrameTime = SDL_GetTicks();
 	bool done = false;
 	while (!done) {
+		U32 currentFrameTime = SDL_GetTicks();
+		U32 elapsedMillis = currentFrameTime - lastFrameTime;
 
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
@@ -44,9 +60,14 @@ int main()
 			if (event.type == SDL_QUIT) {
 				done = true;
 			}
-		}
-	}
+			std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
+		}		
 
+		graphicsContext.drawFrame();
+
+		lastFrameTime = currentFrameTime;
+		Sleep(16); //remove this once we actually have some frame time
+	}
 	graphicsContext.destroy();
 	SDL_DestroyWindow(window);
 

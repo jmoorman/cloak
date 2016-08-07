@@ -1,12 +1,14 @@
 #include "GraphicsContext.h"
 
+#include "OcelotUtils.h"
+
 #define VK_CALL(func_call) { \
 	result = func_call; \
 	if(result != VK_SUCCESS) \
 		std::cerr << "Error in " << __FILE__ << ":" << __LINE__ << "calling " << #func_call << "\n\treturned " << resultToString(result) << '\n'; \
 }
 
-GraphicsContext::GraphicsContext()
+GraphicsContext::GraphicsContext() : frameCount(0)
 {
 }
 
@@ -16,15 +18,35 @@ GraphicsContext::~GraphicsContext()
 
 void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 {
+	createInstance();
+	selectPhysicalDevice();
+	createLogicalDevice();
+	createSurface(hinstance, hwnd);
+	createSwapchain();
+	createImageViews();
+	createRenderPass();
+	createGraphicsPipeline();
+	createFramebuffers();
+	createCommandBuffers();
+	createSemaphores();
+}
+
+void GraphicsContext::createInstance()
+{
 	VkResult result = VK_SUCCESS;
 
 	VkInstanceCreateInfo instanceInfo = {};
 	instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instanceInfo.enabledExtensionCount = 0;
 	instanceInfo.ppEnabledExtensionNames = nullptr;
-	
+
 	result = vkCreateInstance(&instanceInfo, nullptr, &mInstance);
 	assert(checkResult(result));
+}
+
+void GraphicsContext::selectPhysicalDevice()
+{
+	VkResult result = VK_SUCCESS;
 
 	uint32_t physicalDeviceCount = 0;
 	result = vkEnumeratePhysicalDevices(mInstance, &physicalDeviceCount, nullptr);
@@ -32,7 +54,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	assert(physicalDeviceCount > 0);
 	std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
 	vkEnumeratePhysicalDevices(mInstance, &physicalDeviceCount, &physicalDevices[0]);
-	
+
 	mPhysicalDevice = physicalDevices[0];
 	VkPhysicalDeviceProperties deviceProps;
 	vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProps);
@@ -40,21 +62,26 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 		<< "\tdriver version: " << deviceProps.driverVersion << std::endl
 		<< "\tdevice name: " << deviceProps.deviceName << std::endl
 		<< "\tdevice type: " << deviceProps.deviceType << std::endl
-		<< "\tVulkan API version: " 
+		<< "\tVulkan API version: "
 		<< VK_VERSION_MAJOR(deviceProps.apiVersion) << "."
 		<< VK_VERSION_MINOR(deviceProps.apiVersion) << "."
 		<< VK_VERSION_PATCH(deviceProps.apiVersion) << std::endl;
+}
+
+void GraphicsContext::createLogicalDevice()
+{
+	VkResult result = VK_SUCCESS;
 
 	uint32_t queueFamilyCount = 0;
-	uint32_t queueFamilyIndex = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(mPhysicalDevice, &queueFamilyCount, nullptr);
 	assert(queueFamilyCount > 0);
 	std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(mPhysicalDevice, &queueFamilyCount, &queueFamilyProperties[0]);
-	std::cout << "Defaulting to queue family 0" << std::endl
-		<< "\tqueue count: " << queueFamilyProperties[queueFamilyIndex].queueCount << std::endl
+	mQueueFamilyIndex = 0;
+	std::cout << "Defaulting to queue family " << mQueueFamilyIndex << std::endl
+		<< "\tqueue count: " << queueFamilyProperties[mQueueFamilyIndex].queueCount << std::endl
 		<< "\tsupported queue operations:" << std::endl;
-	VkQueueFlags queueFlags = queueFamilyProperties[queueFamilyIndex].queueFlags;
+	VkQueueFlags queueFlags = queueFamilyProperties[mQueueFamilyIndex].queueFlags;
 	if (queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 		std::cout << "\t- Graphics" << std::endl;
 	}
@@ -70,7 +97,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 
 	VkDeviceQueueCreateInfo deviceQueueInfo = {};
 	deviceQueueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	deviceQueueInfo.queueFamilyIndex = queueFamilyIndex;
+	deviceQueueInfo.queueFamilyIndex = mQueueFamilyIndex;
 	float queuePriorities[] = { 1.f };
 	deviceQueueInfo.pQueuePriorities = queuePriorities;
 	deviceQueueInfo.queueCount = 1;
@@ -82,9 +109,12 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	result = vkCreateDevice(mPhysicalDevice, &deviceInfo, nullptr, &mDevice);
 	assert(checkResult(result));
 
-	vkGetDeviceQueue(mDevice, queueFamilyIndex, 0, &mQueue);
+	vkGetDeviceQueue(mDevice, mQueueFamilyIndex, 0, &mQueue);
+}
 
-	//Surface creation
+void GraphicsContext::createSurface(HINSTANCE hinstance, HWND hwnd)
+{
+	VkResult result = VK_SUCCESS;
 
 	VkWin32SurfaceCreateInfoKHR surfaceInfo;
 	surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -94,7 +124,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	assert(checkResult(result));
 
 	VkBool32 isSupported = false;
-	result = vkGetPhysicalDeviceSurfaceSupportKHR(mPhysicalDevice, queueFamilyIndex, mSurface, &isSupported);
+	result = vkGetPhysicalDeviceSurfaceSupportKHR(mPhysicalDevice, mQueueFamilyIndex, mSurface, &isSupported);
 	assert(checkResult(result));
 	assert(isSupported);
 
@@ -111,15 +141,21 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 		mSurfaceFormat.format = surfaceFormats[0].format;
 	}
 	mSurfaceFormat.colorSpace = surfaceFormats[0].colorSpace;
-	
+}
+
+void GraphicsContext::createSwapchain()
+{
+	VkResult result = VK_SUCCESS;
+
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDevice, mSurface, &surfaceCapabilities);
 	assert(checkResult(result));
 	uint32_t desiredImages = surfaceCapabilities.minImageCount + 1;
 	if (surfaceCapabilities.maxImageCount > 0
-			&& desiredImages > surfaceCapabilities.maxImageCount) {
+		&& desiredImages > surfaceCapabilities.maxImageCount) {
 		desiredImages = surfaceCapabilities.maxImageCount;
 	}
+	mSwapchainExtent = surfaceCapabilities.currentExtent;
 
 	VkSwapchainCreateInfoKHR swapchainInfo = {};
 	swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -127,7 +163,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	swapchainInfo.minImageCount = desiredImages;
 	swapchainInfo.imageFormat = mSurfaceFormat.format;
 	swapchainInfo.imageColorSpace = mSurfaceFormat.colorSpace;
-	swapchainInfo.imageExtent = surfaceCapabilities.currentExtent;
+	swapchainInfo.imageExtent = mSwapchainExtent;
 	swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	swapchainInfo.preTransform = surfaceCapabilities.currentTransform;
 	swapchainInfo.imageArrayLayers = 1;
@@ -139,12 +175,17 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	result = vkCreateSwapchainKHR(mDevice, &swapchainInfo, nullptr, &mSwapchain);
 	assert(checkResult(result));
+}
+
+void GraphicsContext::createImageViews()
+{
+	VkResult result = VK_SUCCESS;
 
 	uint32_t imageCount;
 	result = vkGetSwapchainImagesKHR(mDevice, mSwapchain, &imageCount, nullptr);
 	assert(checkResult(result));
-	mImages.resize(imageCount);
-	vkGetSwapchainImagesKHR(mDevice, mSwapchain, &imageCount, &mImages[0]);
+	std::vector<VkImage> images(imageCount);
+	vkGetSwapchainImagesKHR(mDevice, mSwapchain, &imageCount, &images[0]);
 
 	mImageViews.resize(imageCount);
 	VkImageViewCreateInfo colorAttachmentView = {};
@@ -169,7 +210,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
+	commandPoolCreateInfo.queueFamilyIndex = mQueueFamilyIndex;
 	result = vkCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool);
 	assert(checkResult(result));
 
@@ -190,8 +231,8 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 
 	for (uint32_t imageIndex = 0; imageIndex < imageCount; imageIndex++)
 	{
-		setImageLayout(commandBuffer, mImages[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-		colorAttachmentView.image = mImages[imageIndex];
+		setImageLayout(commandBuffer, images[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		colorAttachmentView.image = images[imageIndex];
 		result = vkCreateImageView(mDevice, &colorAttachmentView, nullptr, &mImageViews[imageIndex]);
 		assert(checkResult(result));
 	}
@@ -204,14 +245,325 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	submitInfo.pCommandBuffers = &commandBuffer;
 	result = vkQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE);
 	assert(checkResult(result));
-	
+
 	result = vkQueueWaitIdle(mQueue);
 	assert(checkResult(result));
 	vkFreeCommandBuffers(mDevice, mCommandPool, 1, &commandBuffer);
 }
 
+void GraphicsContext::createRenderPass()
+{
+	VkResult result = VK_SUCCESS;
+
+	VkAttachmentDescription colorAttachment = {};
+	colorAttachment.format = mSurfaceFormat.format;
+	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference colorAttachmentRef = {};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subPass = {};
+	subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subPass.colorAttachmentCount = 1;
+	subPass.pColorAttachments = &colorAttachmentRef;
+
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependency.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.pAttachments = &colorAttachment;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subPass;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = &dependency;
+	result = vkCreateRenderPass(mDevice, &renderPassInfo, nullptr, &mRenderPass);
+	assert(checkResult(result));
+}
+
+void GraphicsContext::createGraphicsPipeline()
+{
+	VkResult result = VK_SUCCESS;
+
+	std::vector<char> vertShaderBytes = OcelotUtils::readFile("../data/shaders/vert.spv");
+	std::vector<char> fragShaderBytes = OcelotUtils::readFile("../data/shaders/frag.spv");
+
+	VkShaderModule vertShaderModule;
+	VkShaderModule fragShaderModule;
+
+	createShaderModule(vertShaderBytes, &vertShaderModule);
+	createShaderModule(fragShaderBytes, &fragShaderModule);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputInfo.vertexBindingDescriptionCount = 0;
+	vertexInputInfo.pVertexBindingDescriptions = nullptr;
+	vertexInputInfo.vertexAttributeDescriptionCount = 0;
+	vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {};
+	inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)mSwapchainExtent.width;
+	viewport.height = (float)mSwapchainExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	scissor.offset = { 0, 0 };
+	scissor.extent = mSwapchainExtent;
+
+	VkPipelineViewportStateCreateInfo viewportState = {};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.depthBiasEnable = VK_FALSE;
+	rasterizer.depthBiasConstantFactor = 0.0f;
+	rasterizer.depthBiasClamp = 0.0f;
+	rasterizer.depthBiasSlopeFactor = 0.0f;
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.minSampleShading = 1.0f; // Optional
+	multisampling.pSampleMask = nullptr; // Optional
+	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+	multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable = VK_FALSE;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+	colorBlending.blendConstants[0] = 0.0f; // Optional
+	colorBlending.blendConstants[1] = 0.0f; // Optional
+	colorBlending.blendConstants[2] = 0.0f; // Optional
+	colorBlending.blendConstants[3] = 0.0f; // Optional
+
+	VkPipelineLayout pipelineLayout;
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 0;
+	pipelineLayoutInfo.pSetLayouts = nullptr;
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+	result = vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+	assert(checkResult(result));
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pDepthStencilState = nullptr;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDynamicState = nullptr;
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = mRenderPass;
+	pipelineInfo.subpass = 0;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
+
+	result = vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mPipeline);
+	assert(checkResult(result));
+
+}
+
+void GraphicsContext::createFramebuffers()
+{
+	VkResult result = VK_SUCCESS;
+
+	mSwapchainFramebuffers.resize(mImageViews.size());
+	for (size_t i = 0; i < mSwapchainFramebuffers.size(); i++)
+	{
+		VkImageView attachments[] = { mImageViews[i] };
+
+		VkFramebufferCreateInfo framebufferInfo = {};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = mRenderPass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = attachments;
+		framebufferInfo.width = mSwapchainExtent.width;
+		framebufferInfo.height = mSwapchainExtent.height;
+		framebufferInfo.layers = 1;
+
+		result = vkCreateFramebuffer(mDevice, &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]);
+		assert(checkResult(result));
+	}
+}
+
+void GraphicsContext::createCommandBuffers()
+{
+	VkResult result = VK_SUCCESS;
+
+	mCommandBuffers.resize(mSwapchainFramebuffers.size());
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = mCommandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = (U32)mCommandBuffers.size();
+
+	result = vkAllocateCommandBuffers(mDevice, &allocInfo, mCommandBuffers.data());
+	assert(checkResult(result));
+
+	for (size_t i = 0; i < mCommandBuffers.size(); i++)
+	{
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+		vkBeginCommandBuffer(mCommandBuffers[i], &beginInfo);
+
+		VkRenderPassBeginInfo renderPassInfo = {};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = mRenderPass;
+		renderPassInfo.framebuffer = mSwapchainFramebuffers[i];
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = mSwapchainExtent;
+
+		VkClearValue clearColor = { 0.f, 0.f, 0.f, 1.f };
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &clearColor;
+
+		vkCmdBeginRenderPass(mCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		{
+			vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+			vkCmdDraw(mCommandBuffers[i], 3, 1, 0, 0);
+		}
+		vkCmdEndRenderPass(mCommandBuffers[i]);
+
+		result = vkEndCommandBuffer(mCommandBuffers[i]);
+		assert(checkResult(result));
+	}
+
+}
+
+void GraphicsContext::createSemaphores()
+{
+	VkResult result = VK_SUCCESS;
+
+	VkSemaphoreCreateInfo semaphoreInfo = {};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	result = vkCreateSemaphore(mDevice, &semaphoreInfo, nullptr, &imageAcquiredSemaphore);
+	assert(checkResult(result));
+	result = vkCreateSemaphore(mDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphore);
+	assert(checkResult(result));
+}
+
+void GraphicsContext::drawFrame()
+{
+	VkResult result = VK_SUCCESS;
+	U32 imageIndex;
+	vkAcquireNextImageKHR(mDevice, mSwapchain, std::numeric_limits<U64>::max(), imageAcquiredSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkSemaphore waitSemaphores[] = { imageAcquiredSemaphore };
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &mCommandBuffers[imageIndex];
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	result = vkQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	assert(checkResult(result));
+
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &mSwapchain;
+	presentInfo.pImageIndices = &imageIndex;
+
+	result = vkQueuePresentKHR(mQueue, &presentInfo);
+	assert(checkResult(result));
+}
+
+void GraphicsContext::createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule)
+{
+	VkResult result = VK_SUCCESS;
+
+	VkShaderModuleCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = (U32*)code.data();
+
+	
+	result = vkCreateShaderModule(mDevice, &createInfo, nullptr, pShaderModule);
+	assert(checkResult(result));
+}
+
 void GraphicsContext::destroy()
 {
+	vkDeviceWaitIdle(mDevice);
+
 	vkDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
 	vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
 	vkDestroyDevice(mDevice, nullptr);

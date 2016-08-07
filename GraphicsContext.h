@@ -14,6 +14,9 @@ public:
 	~GraphicsContext();
 
 	void init(HINSTANCE hinstance, HWND hwnd);
+
+	void drawFrame();
+
 	void destroy();
 
 private:
@@ -21,16 +24,42 @@ private:
 	VkInstance mInstance;
 	VkPhysicalDevice mPhysicalDevice;
 	VkDevice mDevice;
+	VkQueue mQueue;
+	U32 mQueueFamilyIndex;
+
 	VkSurfaceKHR mSurface;
 	VkSurfaceFormatKHR mSurfaceFormat;
+
 	VkSwapchainKHR mSwapchain;
-	std::vector<VkImage> mImages;
+	VkExtent2D mSwapchainExtent;
 	std::vector<VkImageView> mImageViews;
+	std::vector<VkFramebuffer> mSwapchainFramebuffers;
+
+	VkRenderPass mRenderPass;
+	VkPipeline mPipeline;
 	VkCommandPool mCommandPool;
-	VkQueue mQueue;
+	std::vector<VkCommandBuffer> mCommandBuffers;
+	VkSemaphore imageAcquiredSemaphore;
+	VkSemaphore renderFinishedSemaphore;
+
+	uint32_t frameCount;
+
+	//Initialization helpers
+	void createInstance();
+	void createSurface(HINSTANCE hinstance, HWND hwnd);
+	void selectPhysicalDevice();
+	void createLogicalDevice();
+	void createSwapchain();
+	void createImageViews();
+	void createRenderPass();
+	void createGraphicsPipeline();
+	void createFramebuffers();
+	void createCommandBuffers();
+	void createSemaphores();
+
+	void createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule);
 
 	void setImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout);
 	bool checkResult(VkResult result);
 	const char *resultToString(VkResult result);
 };
-
