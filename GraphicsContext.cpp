@@ -313,8 +313,8 @@ void GraphicsContext::createGraphicsPipeline()
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
-	VkVertexInputBindingDescription bindingDescription = ScreenVertex::getBindingDescription();
-	std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = ScreenVertex::getAttributeDescriptions();
+	VkVertexInputBindingDescription bindingDescription = MeshVertex::getBindingDescription();
+	std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = MeshVertex::getAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -454,7 +454,7 @@ void GraphicsContext::createTextureImage()
 	SDL_Surface *surface = IMG_Load("../data/textures/guard1_body.tga");
 	SDL_Surface *imageSurface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
 
-	VkDeviceSize imageSize = surface->w * surface->h * imageSurface->format->BytesPerPixel;
+	U32 imageSize = surface->w * surface->h * imageSurface->format->BytesPerPixel;
 
 	VkImage stagingImage;
 	VkDeviceMemory stagingImageMemory;
@@ -521,7 +521,7 @@ void GraphicsContext::createTextureSampler()
 
 void GraphicsContext::createVertexBuffer()
 {
-	VkDeviceSize bufferSize = sizeof(gDemoVertices[0]) * gDemoVertices.size();
+	U32 bufferSize = sizeof(gDemoVertices[0]) * gDemoVertices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -544,7 +544,7 @@ void GraphicsContext::createVertexBuffer()
 
 void GraphicsContext::createIndexBuffer()
 {
-	VkDeviceSize bufferSize = sizeof(gDemoIndices[0]) * gDemoIndices.size();
+	U32 bufferSize = sizeof(gDemoIndices[0]) * gDemoIndices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;

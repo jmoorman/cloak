@@ -23,7 +23,7 @@ bool Mesh::loadFromObj(const std::string & filename)
 
 	//get file length
 	file.seekg(0, std::ios::end);
-	int fileLength = file.tellg();
+	int fileLength = (int)file.tellg();
 	file.seekg(std::ios::beg);
 
 	std::string token;

@@ -9,7 +9,7 @@ std::vector<char> OcelotUtils::readFile(const std::string& filename)
 		return std::vector<char>(0);
 	}
 
-	size_t fileSize = file.tellg();
+	int fileSize = (int)file.tellg();
 	std::vector<char> buffer(fileSize);
 
 	file.seekg(0);
