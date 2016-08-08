@@ -60,13 +60,14 @@ int main()
 			if (event.type == SDL_QUIT) {
 				done = true;
 			}
-			std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
+			//std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
 		}		
 
+		graphicsContext.updateUniformBuffer(elapsedMillis);
 		graphicsContext.drawFrame();
 
 		lastFrameTime = currentFrameTime;
-		Sleep(16); //remove this once we actually have some frame time
+		Sleep(1); //remove this once we actually have some frame time
 	}
 	graphicsContext.destroy();
 	SDL_DestroyWindow(window);

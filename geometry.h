@@ -19,6 +19,7 @@ struct ScreenVertex
 {
 	glm::vec2 position;
 	glm::vec3 color;
+	glm::vec2 texcoord;
 
 	static VkVertexInputBindingDescription getBindingDescription()
 	{
@@ -29,9 +30,9 @@ struct ScreenVertex
 		return bindingDescription;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions()
 	{
-		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+		std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
@@ -41,6 +42,12 @@ struct ScreenVertex
 		attributeDescriptions[1].location = 1;
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = offsetof(ScreenVertex, color);
+
+		attributeDescriptions[2].binding = 0;
+		attributeDescriptions[2].location = 2;
+		attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[2].offset = offsetof(ScreenVertex, texcoord);
+
 		return attributeDescriptions;
 	}
 };
@@ -48,13 +55,20 @@ struct ScreenVertex
 //This is for demonstration purposes only.
 const std::vector<ScreenVertex> gDemoVertices =
 {
-	{ { 00.0f, -0.5f },	{ 1.0f, 1.0f, 0.0f } },
-	{ { 00.5f, 00.0f },	{ 1.0f, 0.0f, 1.0f } },
-	{ { -0.5f, 00.0f },	{ 0.0f, 1.0f, 1.0f } },
-	{ { 00.0f, 0.5f }, { 1.0f, 1.0f, 0.0f } },
+	{ { -0.5f, -0.5f },	{ 1.0f, 1.0f, 0.0f }, { 0.f, 0.f }},
+	{ { 0.5f, -0.5f },	{ 1.0f, 0.0f, 1.0f }, { 1.f, 0.f } },
+	{ { 0.5f, 0.5f },	{ 0.0f, 1.0f, 1.0f }, { 1.f, 1.f } },
+	{ { -0.5f, 0.5f }, { 1.0f, 1.0f, 1.0f }, { 0.f, 1.f } },
 };
 
 const std::vector<U16> gDemoIndices =
 {
-	0, 1, 2, 2, 1, 3
+	0, 1, 2, 2, 3, 0
+};
+
+struct PerFrameConstantBuffer
+{
+	glm::mat4 modelMatrix;
+	glm::mat4 viewMatrix;
+	glm::mat4 projectionMatrix;
 };
