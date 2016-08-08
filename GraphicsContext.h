@@ -35,6 +35,11 @@ private:
 	VkExtent2D mSwapchainExtent;
 	std::vector<VkImageView> mImageViews;
 	std::vector<VkFramebuffer> mSwapchainFramebuffers;
+	
+	VkImage mDepthImage;
+	VkDeviceMemory mDepthImageMemory;
+	VkImageView mDepthImageView;
+	VkFormat mDepthFormat;
 
 	VkRenderPass mRenderPass;
 	VkDescriptorSetLayout mDescriptorSetLayout;
@@ -69,6 +74,7 @@ private:
 	void createLogicalDevice();
 	void createSwapchain();
 	void createImageViews();
+	void createDepthResources();
 	void createRenderPass();
 	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
@@ -88,13 +94,14 @@ private:
 	void createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule);
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
 	void createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage * image, VkDeviceMemory * imageMemory);
-	void createImageView(VkImage image, VkFormat format, VkImageView * pImageViewOut);
+	void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView * pImageViewOut);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void copyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImage dstImage, U32 width, U32 height);
 	void setImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout);
 	VkCommandBuffer beginSingleUseCommandBuffer();
 	void endSingleUseCommandBuffer(VkCommandBuffer commandBuffer);
 	U32 findMemoryType(U32 typeFilter, VkMemoryPropertyFlags properties);
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 	bool checkResult(VkResult result);
 	const char *resultToString(VkResult result);
