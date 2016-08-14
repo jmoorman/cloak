@@ -151,6 +151,8 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AnimatedMesh.h" />
+    <ClInclude Include="Animation.h" />
     <ClInclude Include="geometry.h" />
     <ClInclude Include="GraphicsContext.h" />
     <ClInclude Include="Mesh.h" />
@@ -158,17 +160,22 @@
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="TextureCache.h" />
     <ClInclude Include="types.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AnimatedMesh.cpp" />
+    <ClCompile Include="Animation.cpp" />
     <ClCompile Include="Cloak.cpp" />
     <ClCompile Include="GraphicsContext.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="OcelotUtils.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="TextureCache.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\data\shaders\animated.vert" />
     <None Include="..\data\shaders\triangle.frag" />
     <None Include="..\data\shaders\triangle.vert" />
   </ItemGroup>

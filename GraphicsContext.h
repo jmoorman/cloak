@@ -7,6 +7,14 @@
 
 #include "stdafx.h"
 
+#include "AnimatedMesh.h"
+
+#ifdef NDEBUG
+const bool gEnableValidationLayers = false;
+#else
+const bool gEnableValidationLayers = true;
+#endif
+
 class GraphicsContext
 {
 public:
@@ -15,7 +23,10 @@ public:
 
 	void init(HINSTANCE hinstance, HWND hwnd);
 
-	void updateUniformBuffer(U32 elapsedMillis);
+	void createCommandBuffer(AnimatedMesh *animatedMesh);
+	void updateConstantBuffer(void *pData, U32 bufferSize, VkBuffer buffer);
+
+	void updatePerFrameConstantBuffer(U32 elapsedMillis);
 	void drawFrame();
 
 	void destroy();
@@ -23,6 +34,7 @@ public:
 private:
 
 	VkInstance mInstance;
+	VkDebugReportCallbackEXT mDebugCallback;
 	VkPhysicalDevice mPhysicalDevice;
 	VkDevice mDevice;
 	VkQueue mQueue;
@@ -49,6 +61,7 @@ private:
 	VkDescriptorSet mDescriptorSet;
 	VkCommandPool mCommandPool;
 	std::vector<VkCommandBuffer> mCommandBuffers;
+	std::vector<VkCommandBuffer> mSecondaryCommandBuffers;
 	VkSemaphore imageAcquiredSemaphore;
 	VkSemaphore renderFinishedSemaphore;
 
@@ -65,10 +78,11 @@ private:
 	VkImageView mTextureImageView;
 	VkSampler mTextureSampler;
 
-	uint32_t frameCount;
+	U32 mFrameCount;
 
 	//Initialization
 	void createInstance();
+	void setupDebugCallback();
 	void createSurface(HINSTANCE hinstance, HWND hwnd);
 	void selectPhysicalDevice();
 	void createLogicalDevice();
@@ -90,7 +104,11 @@ private:
 	void createCommandBuffers();
 	void createSemaphores();
 
+	void createImageFromSurface(SDL_Surface *pSurface, VkImage *pImageOut, VkDeviceMemory *pImageMemoryOut);
+	void createBufferFromData(void *pData, U32 bufferSize, VkBufferUsageFlags usage, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
+
 	//Utility functions
+	bool checkValidationLayerSupport(const std::vector<const char *> &validationLayers);
 	void createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule);
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
 	void createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage * image, VkDeviceMemory * imageMemory);

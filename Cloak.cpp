@@ -3,17 +3,25 @@
 
 #include "stdafx.h"
 
+#include "AnimatedMesh.h"
 #include "GraphicsContext.h"
 #include "Mesh.h"
 
 static Mesh *g_pyramidMesh = nullptr;
-
-void initScene()
+static AnimatedMesh *g_bobLamp = nullptr;
+void initScene(GraphicsContext *graphicsContext)
 {
 	g_pyramidMesh = new Mesh();
 
 	bool success = g_pyramidMesh->loadFromObj("../data/meshes/pyramid.obj");
 
+	g_bobLamp = new AnimatedMesh();
+	success = g_bobLamp->loadModel("../data/models/boblamp.md5mesh");
+	Animation *animation = new Animation();
+	animation->loadAnimation("../data/animations/boblamp.md5anim");
+	g_bobLamp->setAnimation(animation);
+
+	graphicsContext->createCommandBuffer(g_bobLamp);
 }
 
 int main()
@@ -46,7 +54,7 @@ int main()
 	GraphicsContext graphicsContext;
 	graphicsContext.init(GetModuleHandle(NULL), info.info.win.window);
 
-	initScene();
+	initScene(&graphicsContext);
 
 	U32 lastFrameTime = SDL_GetTicks();
 	bool done = false;
@@ -63,7 +71,9 @@ int main()
 			//std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
 		}		
 
-		graphicsContext.updateUniformBuffer(elapsedMillis);
+		graphicsContext.updatePerFrameConstantBuffer(elapsedMillis);
+		g_bobLamp->update(elapsedMillis);
+		graphicsContext.updateConstantBuffer(g_bobLamp->getBoneMatrices().data(), sizeof(AnimationConstantBuffer), g_bobLamp->mAnimationConstantBuffer);
 		graphicsContext.drawFrame();
 
 		lastFrameTime = currentFrameTime;

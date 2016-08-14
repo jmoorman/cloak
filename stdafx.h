@@ -14,6 +14,7 @@
 #include <array>
 #include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -27,6 +28,9 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/compatibility.hpp>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan.h>
