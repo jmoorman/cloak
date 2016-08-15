@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="AnimatedMesh.cpp" />
+    <ClCompile Include="Animation.cpp" />
+    <ClCompile Include="Cloak.cpp" />
+    <ClCompile Include="GraphicsContext.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="TextureCache.cpp" />
+    <ClCompile Include="CloakUtils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AnimatedMesh.h" />
+    <ClInclude Include="Animation.h" />
+    <ClInclude Include="geometry.h" />
+    <ClInclude Include="GraphicsContext.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Shader.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="TextureCache.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="CloakUtils.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\data\shaders\animated.vert">
+      <Filter>data\shaders</Filter>
+    </None>
+    <None Include="..\data\shaders\triangle.frag">
+      <Filter>data\shaders</Filter>
+    </None>
+    <None Include="..\data\shaders\triangle.vert">
+      <Filter>data\shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="data">
+      <UniqueIdentifier>{d344b357-012e-445d-957e-832e6e04ab27}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="data\shaders">
+      <UniqueIdentifier>{cf9b4450-2383-4689-9cd0-a601510c5425}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

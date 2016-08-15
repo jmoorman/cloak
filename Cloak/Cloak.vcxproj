@@ -156,7 +156,7 @@
     <ClInclude Include="geometry.h" />
     <ClInclude Include="GraphicsContext.h" />
     <ClInclude Include="Mesh.h" />
-    <ClInclude Include="OcelotUtils.h" />
+    <ClInclude Include="CloakUtils.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
@@ -169,7 +169,7 @@
     <ClCompile Include="Cloak.cpp" />
     <ClCompile Include="GraphicsContext.cpp" />
     <ClCompile Include="Mesh.cpp" />
-    <ClCompile Include="OcelotUtils.cpp" />
+    <ClCompile Include="CloakUtils.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="TextureCache.cpp" />

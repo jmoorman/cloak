@@ -1,7 +1,7 @@
 #include "GraphicsContext.h"
 
 #include "geometry.h"
-#include "OcelotUtils.h"
+#include "CloakUtils.h"
 
 #define VK_CALL(func_call) { \
 	result = func_call; \
@@ -367,8 +367,8 @@ void GraphicsContext::createGraphicsPipeline()
 {
 	VkResult result = VK_SUCCESS;
 
-	std::vector<char> vertShaderBytes = OcelotUtils::readFile("../data/shaders/vert.spv");
-	std::vector<char> fragShaderBytes = OcelotUtils::readFile("../data/shaders/frag.spv");
+	std::vector<char> vertShaderBytes = CloakUtils::readFile("../data/shaders/vert.spv");
+	std::vector<char> fragShaderBytes = CloakUtils::readFile("../data/shaders/frag.spv");
 
 	VkShaderModule vertShaderModule;
 	VkShaderModule fragShaderModule;

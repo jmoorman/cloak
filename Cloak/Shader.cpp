@@ -1,6 +1,6 @@
 #include "Shader.h"
 
-#include "OcelotUtils.h"
+#include "CloakUtils.h"
 
 Shader::Shader()
 {
@@ -13,7 +13,7 @@ Shader::~Shader()
 
 bool Shader::load(ShaderType shaderType, const std::string & filename)
 {
-	std::vector<char> shaderBytes = OcelotUtils::readFile(filename);
+	std::vector<char> shaderBytes = CloakUtils::readFile(filename);
 
 	if (shaderBytes.size() == 0)
 	{
