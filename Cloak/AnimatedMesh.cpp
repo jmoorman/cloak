@@ -2,7 +2,7 @@
 
 #define DEFAULT_TEXTURE_PATH "../data/textures/"
 
-AnimatedMesh::AnimatedMesh()
+AnimatedMesh::AnimatedMesh() : mPosition(0, 0, 0), mOrientation(0, 0, 0, 1)
 {
 }
 
@@ -62,6 +62,11 @@ void AnimatedMesh::setAnimation(Animation *animation)
 	mAnimation = animation;
 }
 
+void AnimatedMesh::rotate(float angle, const glm::vec3 & axis)
+{
+	mOrientation = glm::angleAxis(angle, axis) * mOrientation;
+}
+
 void AnimatedMesh::update(U32 elapsedMillis)
 {
 	if (mAnimation)
@@ -84,14 +89,18 @@ std::vector<AnimatedSubMesh>& AnimatedMesh::getSubMeshes()
 	return mSubMeshes;
 }
 
+glm::mat4 AnimatedMesh::getModelMatrix()
+{
+	glm::mat4 modelMatrix = glm::mat4_cast(mOrientation);
+	modelMatrix[3][0] = mPosition[0];
+	modelMatrix[3][1] = mPosition[1];
+	modelMatrix[3][2] = mPosition[2];
+	return modelMatrix;
+}
+
 std::vector<glm::mat4>& AnimatedMesh::getBoneMatrices()
 {
 	return mBoneMatrices;
-}
-
-void AnimatedMesh::recordCommandBuffer(VkCommandBuffer commandBuffer)
-{
-
 }
 
 struct BoneWeight

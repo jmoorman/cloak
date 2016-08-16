@@ -41,10 +41,17 @@ public:
 	bool loadModel(const std::string & filename);
 	void setAnimation(Animation *animation);
 
+	void setPosition(const glm::vec3 &position) { mPosition = position; }
+	void setOrientation(const glm::quat &orientation) { mOrientation = orientation; }
+	void rotate(float angle, const glm::vec3 &axis);
+
 	void update(U32 elapsedMillis);
 	std::vector<AnimatedSubMesh>& getSubMeshes();
+	glm::mat4 getModelMatrix();
 	std::vector<glm::mat4>& getBoneMatrices();
-	void recordCommandBuffer(VkCommandBuffer commandBuffer);
+
+	VkBuffer mObjectConstantBuffer;
+	VkDeviceMemory mObjectConstantBufferMemory;
 
 	VkBuffer mAnimationConstantBuffer;
 	VkDeviceMemory mAnimationConstantBufferMemory;
@@ -61,6 +68,8 @@ private:
 	void readSubMesh(std::ifstream &file, U32 fileLength);
 	void readBone(std::ifstream &file, U32 fileLength);
 
+	glm::vec3 mPosition;
+	glm::quat mOrientation;
 	std::vector<AnimatedSubMesh> mSubMeshes;
 	std::vector<Bone> mBones;
 	std::vector<glm::mat4> mBoneMatrices;

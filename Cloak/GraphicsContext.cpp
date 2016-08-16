@@ -924,7 +924,7 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 	mSecondaryCommandBuffers.push_back(commandBuffer);
 }
 
-void GraphicsContext::updateConstantBuffer(void * pData, U32 bufferSize, VkBuffer buffer)
+void GraphicsContext::updateConstantBuffer(const void * pData, U32 bufferSize, VkBuffer buffer)
 {
 	void *data;
 	vkMapMemory(mDevice, mUniformStagingBufferMemory, 0, bufferSize, 0, &data);
@@ -933,30 +933,9 @@ void GraphicsContext::updateConstantBuffer(void * pData, U32 bufferSize, VkBuffe
 	copyBuffer(mUniformStagingBuffer, buffer, bufferSize);
 }
 
-void GraphicsContext::updatePerFrameConstantBuffer(U32 elapsedMillis)
+void GraphicsContext::updatePerFrameConstantBuffer(const PerFrameConstantBuffer &perFrameCB)
 {
-	static U32 totalElapsedMillis = 0;
-	totalElapsedMillis += elapsedMillis;
-
-	PerFrameConstantBuffer perFrameCB = {};
-	perFrameCB.modelMatrix = glm::rotate(
-		glm::rotate(
-			glm::mat4(),
-			glm::radians(-90.f),
-			glm::vec3(1.f, 0.f, 0.f)),
-		glm::radians(90.f),
-		glm::vec3(0.f, 0.f, 1.f));
-	perFrameCB.viewMatrix = glm::lookAt(glm::vec3(150.f, 50.f, 0.f), glm::vec3(0.f, 30.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
-	perFrameCB.projectionMatrix = glm::perspective(glm::radians(45.f), mSwapchainExtent.width / (float)mSwapchainExtent.height, 0.1f, 1000.f);
-	
-	//Y-coordinate fixup because this isn't OpenGL
-	perFrameCB.projectionMatrix[1][1] *= -1;
-
-	void *data;
-	vkMapMemory(mDevice, mUniformStagingBufferMemory, 0, sizeof(perFrameCB), 0, &data);
-	memcpy(data, &perFrameCB, sizeof(perFrameCB));
-	vkUnmapMemory(mDevice, mUniformStagingBufferMemory);
-	copyBuffer(mUniformStagingBuffer, mUniformBuffer, sizeof(perFrameCB));
+	updateConstantBuffer(&perFrameCB, sizeof(perFrameCB), mUniformBuffer);
 }
 
 void GraphicsContext::drawFrame()

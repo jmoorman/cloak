@@ -10,6 +10,7 @@
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="TextureCache.cpp" />
     <ClCompile Include="CloakUtils.cpp" />
+    <ClCompile Include="Camera.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnimatedMesh.h" />
@@ -23,6 +24,7 @@
     <ClInclude Include="TextureCache.h" />
     <ClInclude Include="types.h" />
     <ClInclude Include="CloakUtils.h" />
+    <ClInclude Include="Camera.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\data\shaders\animated.vert">

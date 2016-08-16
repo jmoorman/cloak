@@ -4,11 +4,14 @@
 #include "stdafx.h"
 
 #include "AnimatedMesh.h"
+#include "Camera.h"
 #include "GraphicsContext.h"
 #include "Mesh.h"
 
 static Mesh *g_pyramidMesh = nullptr;
 static AnimatedMesh *g_bobLamp = nullptr;
+static AnimatedMesh *g_bobLamp2 = nullptr;
+
 void initScene(GraphicsContext *graphicsContext)
 {
 	g_pyramidMesh = new Mesh();
@@ -22,12 +25,22 @@ void initScene(GraphicsContext *graphicsContext)
 	g_bobLamp->setAnimation(animation);
 
 	graphicsContext->createCommandBuffer(g_bobLamp);
+
+	g_bobLamp2 = new AnimatedMesh();
+	success = g_bobLamp2->loadModel("../data/models/boblamp.md5mesh");
+	Animation *animation2 = new Animation();
+	animation2->loadAnimation("../data/animations/boblamp.md5anim");
+	g_bobLamp->setAnimation(animation2);
+	
+	//graphicsContext->createCommandBuffer(g_bobLamp2);
 }
 
 int main()
 {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-	SDL_Window *window = SDL_CreateWindow("MyWindow", 800, 200, 640, 480, SDL_WINDOW_SHOWN);
+	const int width = 640;
+	const int height = 480;
+	SDL_Window *window = SDL_CreateWindow("MyWindow", 800, 200, width, height, SDL_WINDOW_SHOWN);
 	assert(window != nullptr);
 
 	SDL_SysWMinfo info;
@@ -51,10 +64,22 @@ int main()
 		printf("Couldn't get window information: %s\n", SDL_GetError());
 	}
 
+	Camera camera;
+	camera.setPerspective(45.f, width / (float)height, 0.1f, 1000.f);
+	camera.setPosition(glm::vec3(0.f, 0.f, -150.f));
+	camera.setDirection(glm::vec3(0.f, 0.f, 1.f));
+
 	GraphicsContext graphicsContext;
 	graphicsContext.init(GetModuleHandle(NULL), info.info.win.window);
 
 	initScene(&graphicsContext);
+	g_bobLamp->setPosition(glm::vec3(0.f, 0.f, -60.f));
+	g_bobLamp->rotate(glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f));
+
+	PerFrameConstantBuffer perFrameCB = {};
+	perFrameCB.modelMatrix = g_bobLamp->getModelMatrix();
+	perFrameCB.viewMatrix = camera.getViewMatrix();
+	perFrameCB.projectionMatrix = camera.getProjectionMatrix();
 
 	U32 lastFrameTime = SDL_GetTicks();
 	bool done = false;
@@ -71,7 +96,11 @@ int main()
 			//std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
 		}		
 
-		graphicsContext.updatePerFrameConstantBuffer(elapsedMillis);
+		camera.move(glm::vec3(elapsedMillis / 10.f,	0.f, 0.f));
+		camera.lookAt(glm::vec3(0.f, 30.f, 0.f));
+		perFrameCB.viewMatrix = camera.getViewMatrix();
+
+		graphicsContext.updatePerFrameConstantBuffer(perFrameCB);
 		g_bobLamp->update(elapsedMillis);
 		graphicsContext.updateConstantBuffer(g_bobLamp->getBoneMatrices().data(), sizeof(AnimationConstantBuffer), g_bobLamp->mAnimationConstantBuffer);
 		graphicsContext.drawFrame();

@@ -24,9 +24,9 @@ public:
 	void init(HINSTANCE hinstance, HWND hwnd);
 
 	void createCommandBuffer(AnimatedMesh *animatedMesh);
-	void updateConstantBuffer(void *pData, U32 bufferSize, VkBuffer buffer);
+	void updateConstantBuffer(const void *pData, U32 bufferSize, VkBuffer buffer);
 
-	void updatePerFrameConstantBuffer(U32 elapsedMillis);
+	void updatePerFrameConstantBuffer(const PerFrameConstantBuffer &perFrameCB);
 	void drawFrame();
 
 	void destroy();
