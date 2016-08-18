@@ -28,10 +28,6 @@ struct AnimatedSubMesh {
 	VkDescriptorSet descriptorSet;
 };
 
-struct AnimationConstantBuffer {
-	glm::mat4 boneMatrices[256];
-};
-
 class AnimatedMesh
 {
 public:
@@ -42,7 +38,9 @@ public:
 	void setAnimation(Animation *animation);
 
 	void setPosition(const glm::vec3 &position) { mPosition = position; }
+	const glm::vec3& getPosition() { return mPosition; }
 	void setOrientation(const glm::quat &orientation) { mOrientation = orientation; }
+	
 	void rotate(float angle, const glm::vec3 &axis);
 
 	void update(U32 elapsedMillis);

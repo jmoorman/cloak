@@ -32,7 +32,7 @@ void initScene(GraphicsContext *graphicsContext)
 	animation2->loadAnimation("../data/animations/boblamp.md5anim");
 	g_bobLamp->setAnimation(animation2);
 	
-	//graphicsContext->createCommandBuffer(g_bobLamp2);
+	graphicsContext->createCommandBuffer(g_bobLamp2);
 }
 
 int main()
@@ -76,10 +76,11 @@ int main()
 	g_bobLamp->setPosition(glm::vec3(0.f, 0.f, -60.f));
 	g_bobLamp->rotate(glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f));
 
-	PerFrameConstantBuffer perFrameCB = {};
-	perFrameCB.modelMatrix = g_bobLamp->getModelMatrix();
+	FrameConstantBuffer perFrameCB = {};
 	perFrameCB.viewMatrix = camera.getViewMatrix();
 	perFrameCB.projectionMatrix = camera.getProjectionMatrix();
+	perFrameCB.lightDirection = glm::normalize(glm::vec4(0.f, -0.5, 0.5, 0.f));
+	perFrameCB.lightColor = glm::vec4(1.f, 1.f, 1.f, 0.25f);
 
 	U32 lastFrameTime = SDL_GetTicks();
 	bool done = false;
@@ -102,6 +103,7 @@ int main()
 
 		graphicsContext.updatePerFrameConstantBuffer(perFrameCB);
 		g_bobLamp->update(elapsedMillis);
+		graphicsContext.updateConstantBuffer((void *)&g_bobLamp->getModelMatrix(), sizeof(ObjectConstantBuffer), g_bobLamp->mObjectConstantBuffer);
 		graphicsContext.updateConstantBuffer(g_bobLamp->getBoneMatrices().data(), sizeof(AnimationConstantBuffer), g_bobLamp->mAnimationConstantBuffer);
 		graphicsContext.drawFrame();
 

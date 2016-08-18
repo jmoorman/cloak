@@ -3,12 +3,18 @@
 
 layout(binding = 0) uniform PerFrameConstantBuffer
 {
-	mat4 modelMatrix;
 	mat4 viewMatrix;
 	mat4 projectionMatrix;
+	vec4 lightDirection;
+	vec4 lightColor;
 } perFrameCB;
 
-layout(binding = 1) uniform AnimationConstantBuffer
+layout(binding = 1) uniform PerObjectConstantBuffer
+{
+	mat4 modelMatrix;
+} perObjectCB;
+
+layout(binding = 2) uniform AnimationConstantBuffer
 {
 	mat4 boneMatrices[256];
 } animationCB;
@@ -21,6 +27,10 @@ layout(location = 4) in uvec4 inBoneIndices;
 
 layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec2 fragTexcoord;
+
+//This is a hack so I don't have to make another constant buffer in the pixel shader right now. Remove ASAP.
+layout(location = 2) out vec4 fragLightDirection;
+layout(location = 3) out vec4 fragLightColor;
 
 out gl_PerVertex
 {
@@ -41,7 +51,10 @@ void main()
 	skinnedNormal += (animationCB.boneMatrices[inBoneIndices.w] * normal) * inBoneWeights.w;
 	skinnedNormal += (animationCB.boneMatrices[inBoneIndices.y] * normal) * inBoneWeights.y;
 
-	gl_Position = perFrameCB.projectionMatrix * perFrameCB.viewMatrix * perFrameCB.modelMatrix * skinnedPosition;
+	gl_Position = perFrameCB.projectionMatrix * perFrameCB.viewMatrix * perObjectCB.modelMatrix * skinnedPosition;
 	fragNormal = normalize(skinnedNormal).xyz;
 	fragTexcoord = inTexcoord;
+
+	fragLightDirection = perFrameCB.lightDirection;
+	fragLightColor = perFrameCB.lightColor;
 }

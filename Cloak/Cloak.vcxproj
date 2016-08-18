@@ -154,6 +154,7 @@
     <ClInclude Include="AnimatedMesh.h" />
     <ClInclude Include="Animation.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="DrawableObject.h" />
     <ClInclude Include="geometry.h" />
     <ClInclude Include="GraphicsContext.h" />
     <ClInclude Include="Mesh.h" />
@@ -169,6 +170,7 @@
     <ClCompile Include="Animation.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cloak.cpp" />
+    <ClCompile Include="DrawableObject.cpp" />
     <ClCompile Include="GraphicsContext.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="CloakUtils.cpp" />

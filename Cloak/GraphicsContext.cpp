@@ -332,28 +332,35 @@ void GraphicsContext::createDescriptorSetLayout()
 {
 	VkResult result = VK_SUCCESS;
 
+	VkDescriptorSetLayoutBinding perFrameLayoutBinding = {};
+	perFrameLayoutBinding.binding = 0;
+	perFrameLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	perFrameLayoutBinding.descriptorCount = 1;
+	perFrameLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	perFrameLayoutBinding.pImmutableSamplers = nullptr;
+
 	VkDescriptorSetLayoutBinding perObjectLayoutBinding = {};
-	perObjectLayoutBinding.binding = 0;
+	perObjectLayoutBinding.binding = 1;
 	perObjectLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	perObjectLayoutBinding.descriptorCount = 1;
 	perObjectLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	perObjectLayoutBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutBinding animationLayoutBinding = {};
-	animationLayoutBinding.binding = 1;
+	animationLayoutBinding.binding = 2;
 	animationLayoutBinding.descriptorCount = 1;
 	animationLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	animationLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	animationLayoutBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 2;
+	samplerLayoutBinding.binding = 3;
 	samplerLayoutBinding.descriptorCount = 1;
 	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	samplerLayoutBinding.pImmutableSamplers = nullptr;
 
-	std::array<VkDescriptorSetLayoutBinding, 3> bindings = { perObjectLayoutBinding, animationLayoutBinding, samplerLayoutBinding };
+	std::array<VkDescriptorSetLayoutBinding, 4> bindings = { perFrameLayoutBinding, perObjectLayoutBinding, animationLayoutBinding, samplerLayoutBinding };
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = bindings.size();
@@ -706,7 +713,7 @@ void GraphicsContext::createUniformBuffer()
 	//make the staging buffer the size of the largest constant buffer for now so it can be used for any buffer
 	createBuffer(sizeof(AnimationConstantBuffer), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&mUniformStagingBuffer, &mUniformStagingBufferMemory);
-	createBuffer(sizeof(PerFrameConstantBuffer), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	createBuffer(sizeof(FrameConstantBuffer), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		&mUniformBuffer, &mUniformBufferMemory);
 }
 
@@ -716,7 +723,7 @@ void GraphicsContext::createDescriptorPool()
 
 	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = 256;
+	poolSizes[0].descriptorCount = 384;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[1].descriptorCount = 128;
 
@@ -747,7 +754,7 @@ void GraphicsContext::createDescriptorSet()
 	VkDescriptorBufferInfo bufferInfo = {};
 	bufferInfo.buffer = mUniformBuffer;
 	bufferInfo.offset = 0;
-	bufferInfo.range = sizeof(PerFrameConstantBuffer);
+	bufferInfo.range = sizeof(FrameConstantBuffer);
 
 	VkDescriptorImageInfo imageInfo = {};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -832,6 +839,11 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 	beginInfo.pInheritanceInfo = &inheritanceInfo;
 	vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
+	ObjectConstantBuffer objectBuffer = {};
+	objectBuffer.modelMatrix = animatedMesh->getModelMatrix();
+	createBufferFromData(&objectBuffer, sizeof(objectBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		&animatedMesh->mObjectConstantBuffer, &animatedMesh->mObjectConstantBufferMemory);
+
 	auto &boneMatrices = animatedMesh->getBoneMatrices();
 	createBufferFromData(boneMatrices.data(), sizeof(boneMatrices[0]) * boneMatrices.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		&animatedMesh->mAnimationConstantBuffer, &animatedMesh->mAnimationConstantBufferMemory);
@@ -864,7 +876,12 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		VkDescriptorBufferInfo bufferInfo = {};
 		bufferInfo.buffer = mUniformBuffer;
 		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(PerFrameConstantBuffer);
+		bufferInfo.range = sizeof(FrameConstantBuffer);
+
+		VkDescriptorBufferInfo objectBufferInfo = {};
+		objectBufferInfo.buffer = animatedMesh->mObjectConstantBuffer;
+		objectBufferInfo.offset = 0;
+		objectBufferInfo.range = sizeof(ObjectConstantBuffer);
 
 		VkDescriptorBufferInfo animationBufferInfo = {};
 		animationBufferInfo.buffer = animatedMesh->mAnimationConstantBuffer;
@@ -876,7 +893,7 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		imageInfo.imageView = subMesh.textureImageView;
 		imageInfo.sampler = mTextureSampler;
 
-		std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
+		std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
 		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		descriptorWrites[0].dstSet = subMesh.descriptorSet;
 		descriptorWrites[0].dstBinding = 0;
@@ -893,7 +910,7 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		descriptorWrites[1].dstArrayElement = 0;
 		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pBufferInfo = &animationBufferInfo;
+		descriptorWrites[1].pBufferInfo = &objectBufferInfo;
 		descriptorWrites[1].pImageInfo = nullptr;
 		descriptorWrites[1].pTexelBufferView = nullptr;
 
@@ -901,11 +918,21 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		descriptorWrites[2].dstSet = subMesh.descriptorSet;
 		descriptorWrites[2].dstBinding = 2;
 		descriptorWrites[2].dstArrayElement = 0;
-		descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		descriptorWrites[2].descriptorCount = 1;
-		descriptorWrites[2].pBufferInfo = nullptr;
-		descriptorWrites[2].pImageInfo = &imageInfo;
+		descriptorWrites[2].pBufferInfo = &animationBufferInfo;
+		descriptorWrites[2].pImageInfo = nullptr;
 		descriptorWrites[2].pTexelBufferView = nullptr;
+
+		descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[3].dstSet = subMesh.descriptorSet;
+		descriptorWrites[3].dstBinding = 3;
+		descriptorWrites[3].dstArrayElement = 0;
+		descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[3].descriptorCount = 1;
+		descriptorWrites[3].pBufferInfo = nullptr;
+		descriptorWrites[3].pImageInfo = &imageInfo;
+		descriptorWrites[3].pTexelBufferView = nullptr;
 
 		vkUpdateDescriptorSets(mDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 
@@ -933,7 +960,7 @@ void GraphicsContext::updateConstantBuffer(const void * pData, U32 bufferSize, V
 	copyBuffer(mUniformStagingBuffer, buffer, bufferSize);
 }
 
-void GraphicsContext::updatePerFrameConstantBuffer(const PerFrameConstantBuffer &perFrameCB)
+void GraphicsContext::updatePerFrameConstantBuffer(const FrameConstantBuffer &perFrameCB)
 {
 	updateConstantBuffer(&perFrameCB, sizeof(perFrameCB), mUniformBuffer);
 }

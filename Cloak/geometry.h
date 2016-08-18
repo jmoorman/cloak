@@ -147,9 +147,20 @@ const std::vector<U16> gDemoIndices =
 	2, 1, 3, 4, 3, 1,
 };
 
-struct PerFrameConstantBuffer
+struct FrameConstantBuffer
 {
-	glm::mat4 modelMatrix;
 	glm::mat4 viewMatrix;
 	glm::mat4 projectionMatrix;
+	glm::vec4 lightDirection;
+	glm::vec4 lightColor;
+};
+
+struct ObjectConstantBuffer
+{
+	glm::mat4 modelMatrix;
+};
+
+struct AnimationConstantBuffer
+{
+	glm::mat4 boneMatrices[256];
 };
