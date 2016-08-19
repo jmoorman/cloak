@@ -2,7 +2,7 @@
 
 #define DEFAULT_TEXTURE_PATH "../data/textures/"
 
-AnimatedMesh::AnimatedMesh() : mPosition(0, 0, 0), mOrientation(0, 0, 0, 1)
+AnimatedMesh::AnimatedMesh() : DrawableObject(kDrawableTypeAnimatedMesh)
 {
 }
 
@@ -42,7 +42,7 @@ bool AnimatedMesh::loadModel(const std::string &filename)
 		}
 		else if (token == "joints") {
 			file >> ignore; //opening brace
-			for (int i = 0; i < boneCount; i++) {
+			for (U32 i = 0; i < boneCount; i++) {
 				readBone(file, fileLength);
 			}
 			file >> ignore; // closing brace
@@ -62,10 +62,6 @@ void AnimatedMesh::setAnimation(Animation *animation)
 	mAnimation = animation;
 }
 
-void AnimatedMesh::rotate(float angle, const glm::vec3 & axis)
-{
-	mOrientation = glm::angleAxis(angle, axis) * mOrientation;
-}
 
 void AnimatedMesh::update(U32 elapsedMillis)
 {
@@ -73,7 +69,7 @@ void AnimatedMesh::update(U32 elapsedMillis)
 	{
 		mAnimation->update(elapsedMillis);
 		const Animation::FrameSkeleton &skeleton = mAnimation->getSkeleton();
-		for (int i = 0; i < skeleton.bones.size(); i++)
+		for (U32 i = 0; i < skeleton.bones.size(); i++)
 		{
 			const Animation::SkeletonBone &bone = skeleton.bones[i];
 		
@@ -87,15 +83,6 @@ void AnimatedMesh::update(U32 elapsedMillis)
 std::vector<AnimatedSubMesh>& AnimatedMesh::getSubMeshes()
 {
 	return mSubMeshes;
-}
-
-glm::mat4 AnimatedMesh::getModelMatrix()
-{
-	glm::mat4 modelMatrix = glm::mat4_cast(mOrientation);
-	modelMatrix[3][0] = mPosition[0];
-	modelMatrix[3][1] = mPosition[1];
-	modelMatrix[3][2] = mPosition[2];
-	return modelMatrix;
 }
 
 std::vector<glm::mat4>& AnimatedMesh::getBoneMatrices()

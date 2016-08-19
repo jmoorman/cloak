@@ -1,13 +1,13 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(binding = 0) uniform PerFrameConstantBuffer
+layout(binding = 0) uniform SceneConstantBuffer
 {
 	mat4 viewMatrix;
 	mat4 projectionMatrix;
 	vec4 lightDirection;
 	vec4 lightColor;
-} perFrameCB;
+} sceneConstantBuffer;
 
 layout(binding = 1) uniform PerObjectConstantBuffer
 {
@@ -51,10 +51,10 @@ void main()
 	skinnedNormal += (animationCB.boneMatrices[inBoneIndices.w] * normal) * inBoneWeights.w;
 	skinnedNormal += (animationCB.boneMatrices[inBoneIndices.y] * normal) * inBoneWeights.y;
 
-	gl_Position = perFrameCB.projectionMatrix * perFrameCB.viewMatrix * perObjectCB.modelMatrix * skinnedPosition;
+	gl_Position = sceneConstantBuffer.projectionMatrix * sceneConstantBuffer.viewMatrix * perObjectCB.modelMatrix * skinnedPosition;
 	fragNormal = normalize(skinnedNormal).xyz;
 	fragTexcoord = inTexcoord;
 
-	fragLightDirection = perFrameCB.lightDirection;
-	fragLightColor = perFrameCB.lightColor;
+	fragLightDirection = sceneConstantBuffer.lightDirection;
+	fragLightColor = sceneConstantBuffer.lightColor;
 }

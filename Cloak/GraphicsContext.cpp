@@ -713,7 +713,7 @@ void GraphicsContext::createUniformBuffer()
 	//make the staging buffer the size of the largest constant buffer for now so it can be used for any buffer
 	createBuffer(sizeof(AnimationConstantBuffer), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&mUniformStagingBuffer, &mUniformStagingBufferMemory);
-	createBuffer(sizeof(FrameConstantBuffer), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	createBuffer(sizeof(SceneConstantBuffer), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		&mUniformBuffer, &mUniformBufferMemory);
 }
 
@@ -754,7 +754,7 @@ void GraphicsContext::createDescriptorSet()
 	VkDescriptorBufferInfo bufferInfo = {};
 	bufferInfo.buffer = mUniformBuffer;
 	bufferInfo.offset = 0;
-	bufferInfo.range = sizeof(FrameConstantBuffer);
+	bufferInfo.range = sizeof(SceneConstantBuffer);
 
 	VkDescriptorImageInfo imageInfo = {};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -823,8 +823,7 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 	allocInfo.commandBufferCount = 1;
 
-	VkCommandBuffer commandBuffer;
-	result = vkAllocateCommandBuffers(mDevice, &allocInfo, &commandBuffer);
+	result = vkAllocateCommandBuffers(mDevice, &allocInfo, &animatedMesh->mCommandBuffer);
 	assert(checkResult(result));
 	
 	VkCommandBufferInheritanceInfo inheritanceInfo = {};
@@ -837,10 +836,10 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	beginInfo.pInheritanceInfo = &inheritanceInfo;
-	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+	vkBeginCommandBuffer(animatedMesh->mCommandBuffer, &beginInfo);
 
 	ObjectConstantBuffer objectBuffer = {};
-	objectBuffer.modelMatrix = animatedMesh->getModelMatrix();
+	objectBuffer.modelMatrix = animatedMesh->buildModelMatrix();
 	createBufferFromData(&objectBuffer, sizeof(objectBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		&animatedMesh->mObjectConstantBuffer, &animatedMesh->mObjectConstantBufferMemory);
 
@@ -876,7 +875,7 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		VkDescriptorBufferInfo bufferInfo = {};
 		bufferInfo.buffer = mUniformBuffer;
 		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(FrameConstantBuffer);
+		bufferInfo.range = sizeof(SceneConstantBuffer);
 
 		VkDescriptorBufferInfo objectBufferInfo = {};
 		objectBufferInfo.buffer = animatedMesh->mObjectConstantBuffer;
@@ -937,18 +936,18 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		vkUpdateDescriptorSets(mDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 
 		//Record commands
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+		vkCmdBindPipeline(animatedMesh->mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 		VkBuffer vertexBuffers[] = { subMesh.vertexBuffer };
 		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-		vkCmdBindIndexBuffer(commandBuffer, subMesh.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &subMesh.descriptorSet, 0, nullptr);
-		vkCmdDrawIndexed(commandBuffer, subMesh.indices.size(), 1, 0, 0, 0);
+		vkCmdBindVertexBuffers(animatedMesh->mCommandBuffer, 0, 1, vertexBuffers, offsets);
+		vkCmdBindIndexBuffer(animatedMesh->mCommandBuffer, subMesh.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindDescriptorSets(animatedMesh->mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &subMesh.descriptorSet, 0, nullptr);
+		vkCmdDrawIndexed(animatedMesh->mCommandBuffer, subMesh.indices.size(), 1, 0, 0, 0);
 	}
 
-	vkEndCommandBuffer(commandBuffer);
+	vkEndCommandBuffer(animatedMesh->mCommandBuffer);
 
-	mSecondaryCommandBuffers.push_back(commandBuffer);
+	mSecondaryCommandBuffers.push_back(animatedMesh->mCommandBuffer);
 }
 
 void GraphicsContext::updateConstantBuffer(const void * pData, U32 bufferSize, VkBuffer buffer)
@@ -960,9 +959,9 @@ void GraphicsContext::updateConstantBuffer(const void * pData, U32 bufferSize, V
 	copyBuffer(mUniformStagingBuffer, buffer, bufferSize);
 }
 
-void GraphicsContext::updatePerFrameConstantBuffer(const FrameConstantBuffer &perFrameCB)
+void GraphicsContext::updateSceneConstantBuffer(const SceneConstantBuffer &sceneConstantBuffer)
 {
-	updateConstantBuffer(&perFrameCB, sizeof(perFrameCB), mUniformBuffer);
+	updateConstantBuffer(&sceneConstantBuffer, sizeof(sceneConstantBuffer), mUniformBuffer);
 }
 
 void GraphicsContext::drawFrame()

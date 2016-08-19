@@ -19,10 +19,10 @@ public:
 	void setPerspective(float fovy, float aspectRatio, float nearPlane, float farPlane);
 
 	//relative movement/rotation
-	void move(float dx, float dy, float dz);
-	void move(const glm::vec3 &movement);
-	void rotate(float angle, const glm::vec3 &axis);
-	void rotate(const glm::quat &rotation);
+	void moveBy(float dx, float dy, float dz);
+	void moveBy(const glm::vec3 &movement);
+	void rotateBy(float angle, const glm::vec3 &axis);
+	void rotateBy(const glm::quat &rotation);
 
 	void rotatePitch(float deltaPitch);
 	void rotateYaw(float deltaYaw);

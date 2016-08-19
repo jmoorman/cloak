@@ -12,6 +12,7 @@
     <ClCompile Include="CloakUtils.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DrawableObject.cpp" />
+    <ClCompile Include="GraphicsObject.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnimatedMesh.h" />
@@ -27,6 +28,7 @@
     <ClInclude Include="CloakUtils.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DrawableObject.h" />
+    <ClInclude Include="GraphicsObject.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\data\shaders\animated.vert">

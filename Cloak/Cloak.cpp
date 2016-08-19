@@ -9,8 +9,10 @@
 #include "Mesh.h"
 
 static Mesh *g_pyramidMesh = nullptr;
-static AnimatedMesh *g_bobLamp = nullptr;
-static AnimatedMesh *g_bobLamp2 = nullptr;
+#define BOB_ROWS 4
+#define BOB_COLS 5
+#define BOB_COUNT (BOB_ROWS * BOB_COLS)
+static AnimatedMesh *g_bobLampArray[BOB_COUNT];
 
 void initScene(GraphicsContext *graphicsContext)
 {
@@ -18,21 +20,24 @@ void initScene(GraphicsContext *graphicsContext)
 
 	bool success = g_pyramidMesh->loadFromObj("../data/meshes/pyramid.obj");
 
-	g_bobLamp = new AnimatedMesh();
-	success = g_bobLamp->loadModel("../data/models/boblamp.md5mesh");
-	Animation *animation = new Animation();
-	animation->loadAnimation("../data/animations/boblamp.md5anim");
-	g_bobLamp->setAnimation(animation);
-
-	graphicsContext->createCommandBuffer(g_bobLamp);
-
-	g_bobLamp2 = new AnimatedMesh();
-	success = g_bobLamp2->loadModel("../data/models/boblamp.md5mesh");
-	Animation *animation2 = new Animation();
-	animation2->loadAnimation("../data/animations/boblamp.md5anim");
-	g_bobLamp->setAnimation(animation2);
-	
-	graphicsContext->createCommandBuffer(g_bobLamp2);
+	int count = 0;
+	for (int i = 0; i < BOB_COLS; i++)
+	{
+		for (int j = 0; j < BOB_ROWS; j++)
+		{
+			AnimatedMesh *bob = new AnimatedMesh();
+			bob->loadModel("../data/models/boblamp.md5mesh");
+			Animation *animation = new Animation();
+			animation->loadAnimation("../data/animations/boblamp.md5anim");
+			bob->setAnimation(animation);
+			bob->setPosition(glm::vec3(i * 4, 0.f, j * 4));
+			bob->rotateBy(glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f));
+			bob->setScale(glm::vec3(0.1f, 0.1f, 0.1f));
+			bob->update(rand() % 5000);
+			graphicsContext->createCommandBuffer(bob);
+			g_bobLampArray[count++] = bob;
+		}
+	}
 }
 
 int main()
@@ -66,17 +71,14 @@ int main()
 
 	Camera camera;
 	camera.setPerspective(45.f, width / (float)height, 0.1f, 1000.f);
-	camera.setPosition(glm::vec3(0.f, 0.f, -150.f));
-	camera.setDirection(glm::vec3(0.f, 0.f, 1.f));
+	camera.setPosition(glm::vec3(7.5f, 15.f, -15.f));
 
 	GraphicsContext graphicsContext;
 	graphicsContext.init(GetModuleHandle(NULL), info.info.win.window);
 
 	initScene(&graphicsContext);
-	g_bobLamp->setPosition(glm::vec3(0.f, 0.f, -60.f));
-	g_bobLamp->rotate(glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f));
 
-	FrameConstantBuffer perFrameCB = {};
+	SceneConstantBuffer perFrameCB = {};
 	perFrameCB.viewMatrix = camera.getViewMatrix();
 	perFrameCB.projectionMatrix = camera.getProjectionMatrix();
 	perFrameCB.lightDirection = glm::normalize(glm::vec4(0.f, -0.5, 0.5, 0.f));
@@ -94,17 +96,23 @@ int main()
 			if (event.type == SDL_QUIT) {
 				done = true;
 			}
-			//std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
-		}		
+			std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
+		}
 
-		camera.move(glm::vec3(elapsedMillis / 10.f,	0.f, 0.f));
-		camera.lookAt(glm::vec3(0.f, 30.f, 0.f));
+		camera.moveBy(glm::vec3(elapsedMillis / 200.f, 0.f, 0.f));
+		camera.lookAt(glm::vec3(7.5f, 0.f, 5.f));
 		perFrameCB.viewMatrix = camera.getViewMatrix();
 
-		graphicsContext.updatePerFrameConstantBuffer(perFrameCB);
-		g_bobLamp->update(elapsedMillis);
-		graphicsContext.updateConstantBuffer((void *)&g_bobLamp->getModelMatrix(), sizeof(ObjectConstantBuffer), g_bobLamp->mObjectConstantBuffer);
-		graphicsContext.updateConstantBuffer(g_bobLamp->getBoneMatrices().data(), sizeof(AnimationConstantBuffer), g_bobLamp->mAnimationConstantBuffer);
+		graphicsContext.updateSceneConstantBuffer(perFrameCB);
+
+		for (int i = 0; i < BOB_COUNT; i++)
+		{
+			AnimatedMesh *bob = g_bobLampArray[i];
+			bob->update(elapsedMillis);
+			graphicsContext.updateConstantBuffer((void *)&bob->buildModelMatrix(), sizeof(ObjectConstantBuffer), bob->mObjectConstantBuffer);
+			graphicsContext.updateConstantBuffer(bob->getBoneMatrices().data(), bob->getBoneMatrices().size() * sizeof(glm::mat4), bob->mAnimationConstantBuffer);
+		}
+
 		graphicsContext.drawFrame();
 
 		lastFrameTime = currentFrameTime;

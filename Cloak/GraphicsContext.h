@@ -26,7 +26,7 @@ public:
 	void createCommandBuffer(AnimatedMesh *animatedMesh);
 	void updateConstantBuffer(const void *pData, U32 bufferSize, VkBuffer buffer);
 
-	void updatePerFrameConstantBuffer(const FrameConstantBuffer &perFrameCB);
+	void updateSceneConstantBuffer(const SceneConstantBuffer &sceneConstantBuffer);
 	void drawFrame();
 
 	void destroy();

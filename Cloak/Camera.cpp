@@ -43,7 +43,7 @@ void Camera::setPerspective(float fovy, float aspectRatio, float nearPlane, floa
 	mFarPlane = farPlane;
 }
 
-void Camera::move(float dx, float dy, float dz)
+void Camera::moveBy(float dx, float dy, float dz)
 {
 	//x moves side to side, orthogonal to the camera's direction
 	//y moves along the up vector
@@ -55,24 +55,24 @@ void Camera::move(float dx, float dy, float dz)
 	mPosition = mPosition + xComponent + yComponent + zComponent;
 }
 
-void Camera::move(const glm::vec3 &movement) {
-	move(movement.x, movement.y, movement.z);
+void Camera::moveBy(const glm::vec3 &movement) {
+	moveBy(movement.x, movement.y, movement.z);
 }
 
-void Camera::rotate(const glm::quat &rotation) {
+void Camera::rotateBy(const glm::quat &rotation) {
 	mDirection = glm::normalize(rotation * mDirection);
 }
 
-void Camera::rotate(float angle, const glm::vec3 &axis) {
-	rotate(glm::angleAxis(angle, axis));
+void Camera::rotateBy(float angle, const glm::vec3 &axis) {
+	rotateBy(glm::angleAxis(angle, axis));
 }
 
 void Camera::rotatePitch(float deltaPitch) {
-	rotate(deltaPitch, glm::cross(mUp, mDirection));
+	rotateBy(deltaPitch, glm::cross(mUp, mDirection));
 }
 
 void Camera::rotateYaw(float deltaYaw) {
-	rotate(deltaYaw, mUp);
+	rotateBy(deltaYaw, mUp);
 }
 
 const glm::mat4 Camera::getViewMatrix()

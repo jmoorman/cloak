@@ -147,7 +147,7 @@ const std::vector<U16> gDemoIndices =
 	2, 1, 3, 4, 3, 1,
 };
 
-struct FrameConstantBuffer
+struct SceneConstantBuffer
 {
 	glm::mat4 viewMatrix;
 	glm::mat4 projectionMatrix;
