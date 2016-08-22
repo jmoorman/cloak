@@ -76,6 +76,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(SolutionDir)3rdparty\glm-0.9.7.1;C:\VulkanSDK\1.0.5.0\Include\vulkan;$(SolutionDir)3rdparty\SDL2_image-2.0.0\include;$(SolutionDir)3rdparty\SDL2-2.0.3\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\VulkanSDK\1.0.5.0\Bin;$(SolutionDir)3rdparty\SDL2_image-2.0.0\lib\x64;$(SolutionDir)3rdparty\SDL2-2.0.3\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -84,6 +86,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(SolutionDir)3rdparty\glm-0.9.7.1;C:\VulkanSDK\1.0.5.0\Include\vulkan;$(SolutionDir)3rdparty\SDL2_image-2.0.0\include;$(SolutionDir)3rdparty\SDL2-2.0.3\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\VulkanSDK\1.0.5.0\Bin;$(SolutionDir)3rdparty\SDL2_image-2.0.0\lib\x64;$(SolutionDir)3rdparty\SDL2-2.0.3\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -110,6 +114,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -145,6 +150,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -157,6 +163,7 @@
     <ClInclude Include="DrawableObject.h" />
     <ClInclude Include="geometry.h" />
     <ClInclude Include="GraphicsContext.h" />
+    <ClInclude Include="GraphicsMemoryHeap.h" />
     <ClInclude Include="GraphicsObject.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="CloakUtils.h" />
@@ -173,6 +180,7 @@
     <ClCompile Include="Cloak.cpp" />
     <ClCompile Include="DrawableObject.cpp" />
     <ClCompile Include="GraphicsContext.cpp" />
+    <ClCompile Include="GraphicsMemoryHeap.cpp" />
     <ClCompile Include="GraphicsObject.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="CloakUtils.cpp" />

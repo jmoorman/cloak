@@ -8,6 +8,7 @@
 #include "stdafx.h"
 
 #include "AnimatedMesh.h"
+#include "GraphicsMemoryHeap.h"
 
 #ifdef NDEBUG
 const bool gEnableValidationLayers = false;
@@ -32,6 +33,9 @@ public:
 	void destroy();
 
 private:
+
+	VkPhysicalDeviceProperties mPhysicalDeviceProperties;
+	VkPhysicalDeviceMemoryProperties mPhysicalMemoryProperties;
 
 	VkInstance mInstance;
 	VkDebugReportCallbackEXT mDebugCallback;
@@ -78,6 +82,8 @@ private:
 	VkImageView mTextureImageView;
 	VkSampler mTextureSampler;
 
+	GraphicsMemoryHeap *mGraphicsMemory;
+
 	U32 mFrameCount;
 
 	//Initialization
@@ -86,6 +92,7 @@ private:
 	void createSurface(HINSTANCE hinstance, HWND hwnd);
 	void selectPhysicalDevice();
 	void createLogicalDevice();
+	void createMemoryHeaps();
 	void createSwapchain();
 	void createImageViews();
 	void createDepthResources();

@@ -82,9 +82,9 @@ void GraphicsContext::createInstance()
 		assert(checkValidationLayerSupport(validationLayers));
 		instanceInfo.enabledLayerCount = validationLayers.size();
 		instanceInfo.ppEnabledLayerNames = validationLayers.data();
-		instanceInfo.enabledExtensionCount = enabledExtensions.size();
-		instanceInfo.ppEnabledExtensionNames = enabledExtensions.data();
 	}
+	instanceInfo.enabledExtensionCount = enabledExtensions.size();
+	instanceInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
 	result = vkCreateInstance(&instanceInfo, nullptr, &mInstance);
 	assert(checkResult(result));
@@ -120,16 +120,17 @@ void GraphicsContext::selectPhysicalDevice()
 	vkEnumeratePhysicalDevices(mInstance, &physicalDeviceCount, &physicalDevices[0]);
 
 	mPhysicalDevice = physicalDevices[0];
-	VkPhysicalDeviceProperties deviceProps;
-	vkGetPhysicalDeviceProperties(mPhysicalDevice, &deviceProps);
+	vkGetPhysicalDeviceProperties(mPhysicalDevice, &mPhysicalDeviceProperties);
 	std::cout << "Defaulting to device 0" << std::endl
-		<< "\tdriver version: " << deviceProps.driverVersion << std::endl
-		<< "\tdevice name: " << deviceProps.deviceName << std::endl
-		<< "\tdevice type: " << deviceProps.deviceType << std::endl
+		<< "\tdriver version: " << mPhysicalDeviceProperties.driverVersion << std::endl
+		<< "\tdevice name: " << mPhysicalDeviceProperties.deviceName << std::endl
+		<< "\tdevice type: " << mPhysicalDeviceProperties.deviceType << std::endl
 		<< "\tVulkan API version: "
-		<< VK_VERSION_MAJOR(deviceProps.apiVersion) << "."
-		<< VK_VERSION_MINOR(deviceProps.apiVersion) << "."
-		<< VK_VERSION_PATCH(deviceProps.apiVersion) << std::endl;
+		<< VK_VERSION_MAJOR(mPhysicalDeviceProperties.apiVersion) << "."
+		<< VK_VERSION_MINOR(mPhysicalDeviceProperties.apiVersion) << "."
+		<< VK_VERSION_PATCH(mPhysicalDeviceProperties.apiVersion) << std::endl;
+
+	vkGetPhysicalDeviceMemoryProperties(mPhysicalDevice, &mPhysicalMemoryProperties);
 }
 
 void GraphicsContext::createLogicalDevice()
@@ -181,6 +182,11 @@ void GraphicsContext::createLogicalDevice()
 	commandPoolCreateInfo.queueFamilyIndex = mQueueFamilyIndex;
 	result = vkCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool);
 	assert(checkResult(result));
+}
+
+void GraphicsContext::createMemoryHeaps()
+{
+	mGraphicsMemory = new GraphicsMemoryHeap(mPhysicalDevice, mDevice, 1024 * 1024 * 100, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); //100 MB
 }
 
 void GraphicsContext::createSurface(HINSTANCE hinstance, HWND hwnd)
@@ -723,15 +729,15 @@ void GraphicsContext::createDescriptorPool()
 
 	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = 384;
+	poolSizes[0].descriptorCount = 4096;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = 128;
+	poolSizes[1].descriptorCount = 1024;
 
 	VkDescriptorPoolCreateInfo poolInfo = {};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = poolSizes.size();
 	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = 128;
+	poolInfo.maxSets = 1024;
 
 	result = vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &mDescriptorPool);
 	assert(checkResult(result));
@@ -1047,7 +1053,7 @@ bool GraphicsContext::checkValidationLayerSupport(const std::vector<const char *
 	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 	std::vector<VkLayerProperties> availableLayers(layerCount);
 	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
+		
 	for (const char* layerName : validationLayers)
 	{
 		bool layerFound = false;
@@ -1105,6 +1111,7 @@ void GraphicsContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 	//This is bad practice. We should be allocating a large block up-front and managing our own suballocations
 	result = vkAllocateMemory(mDevice, &allocInfo, nullptr, pBufferMemoryOut);
 	assert(checkResult(result));
+	//const GraphicsAllocation &allocation = mGraphicsMemory->alloc(memReq);
 
 	vkBindBufferMemory(mDevice, *pBufferOut, *pBufferMemoryOut, 0);
 }
@@ -1329,11 +1336,9 @@ void GraphicsContext::endSingleUseCommandBuffer(VkCommandBuffer commandBuffer)
 
 U32 GraphicsContext::findMemoryType(U32 typeFilter, VkMemoryPropertyFlags properties)
 {
-	VkPhysicalDeviceMemoryProperties memProps;
-	vkGetPhysicalDeviceMemoryProperties(mPhysicalDevice, &memProps);
-	for (U32 i = 0; i < memProps.memoryTypeCount; i++)
+	for (U32 i = 0; i < mPhysicalMemoryProperties.memoryTypeCount; i++)
 	{
-		if (typeFilter & (1 << i) && ((memProps.memoryTypes[i].propertyFlags & properties) == properties))
+		if (typeFilter & (1 << i) && ((mPhysicalMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties))
 		{
 			return i;
 		}

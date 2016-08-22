@@ -9,8 +9,8 @@
 #include "Mesh.h"
 
 static Mesh *g_pyramidMesh = nullptr;
-#define BOB_ROWS 4
-#define BOB_COLS 5
+#define BOB_ROWS 10
+#define BOB_COLS 10
 #define BOB_COUNT (BOB_ROWS * BOB_COLS)
 static AnimatedMesh *g_bobLampArray[BOB_COUNT];
 
@@ -71,7 +71,7 @@ int main()
 
 	Camera camera;
 	camera.setPerspective(45.f, width / (float)height, 0.1f, 1000.f);
-	camera.setPosition(glm::vec3(7.5f, 15.f, -15.f));
+	camera.setPosition(glm::vec3(BOB_COLS * 2.5, 15.f, BOB_ROWS * 5.f));
 
 	GraphicsContext graphicsContext;
 	graphicsContext.init(GetModuleHandle(NULL), info.info.win.window);
@@ -99,7 +99,7 @@ int main()
 			std::cout << "FPS: " << (1000.f / elapsedMillis) << "(" << elapsedMillis << "ms)" << std::endl;
 		}
 
-		camera.moveBy(glm::vec3(elapsedMillis / 200.f, 0.f, 0.f));
+		camera.moveBy(glm::vec3(elapsedMillis / 100.f, 0.f, 0.f));
 		camera.lookAt(glm::vec3(7.5f, 0.f, 5.f));
 		perFrameCB.viewMatrix = camera.getViewMatrix();
 
