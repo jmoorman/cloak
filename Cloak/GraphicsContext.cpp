@@ -36,6 +36,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	setupDebugCallback();
 	selectPhysicalDevice();
 	createLogicalDevice();
+	createMemoryHeaps();
 	createSurface(hinstance, hwnd);
 	createSwapchain();
 	createImageViews();
@@ -44,13 +45,10 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	createDescriptorSetLayout();
 	createGraphicsPipeline();
 	createFramebuffers();
-	createTextureImage();
-	createTextureImageView();
 	createTextureSampler();
 	createVertexBuffer();
 	createUniformBuffer();
 	createDescriptorPool();
-	createDescriptorSet();
 	createIndexBuffer();
 	createCommandBuffers();
 	createSemaphores();
@@ -186,7 +184,8 @@ void GraphicsContext::createLogicalDevice()
 
 void GraphicsContext::createMemoryHeaps()
 {
-	mGraphicsMemory = new GraphicsMemoryHeap(mPhysicalDevice, mDevice, 1024 * 1024 * 100, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); //100 MB
+	m_graphicsMemory = new GpuMemoryHeap(mPhysicalDevice, mDevice, 1024 * 1024 * 100, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); //100 MB
+	m_stagingGraphicsMemory = new GpuMemoryHeap(mPhysicalDevice, mDevice, 1024 * 1024 * 100, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); //100 MB
 }
 
 void GraphicsContext::createSurface(HINSTANCE hinstance, HWND hwnd)
@@ -294,7 +293,7 @@ void GraphicsContext::createRenderPass()
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentDescription depthAttachment = {};
-	depthAttachment.format = mDepthFormat;
+	depthAttachment.format = m_depthFormat;
 	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -529,17 +528,17 @@ void GraphicsContext::createGraphicsPipeline()
 void GraphicsContext::createDepthResources()
 {
 	const std::vector<VkFormat> candidates = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT };
-	mDepthFormat = findSupportedFormat(candidates, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+	m_depthFormat = findSupportedFormat(candidates, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	createImage(mSwapchainExtent.width, mSwapchainExtent.height, mDepthFormat,
+	createImage(mSwapchainExtent.width, mSwapchainExtent.height, m_depthFormat,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		&mDepthImage, &mDepthImageMemory);
-	createImageView(mDepthImage, mDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, &mDepthImageView);
+		&m_depthImage);
+	createImageView(m_depthImage.image, m_depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, &m_depthImageView);
 
 	VkCommandBuffer commandBuffer = beginSingleUseCommandBuffer();
-	setImageLayout(commandBuffer, mDepthImage, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	setImageLayout(commandBuffer, m_depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 	endSingleUseCommandBuffer(commandBuffer);
 }
 
@@ -550,7 +549,7 @@ void GraphicsContext::createFramebuffers()
 	mSwapchainFramebuffers.resize(mImageViews.size());
 	for (size_t i = 0; i < mSwapchainFramebuffers.size(); i++)
 	{
-		std::array<VkImageView, 2> attachments = { mImageViews[i], mDepthImageView };
+		std::array<VkImageView, 2> attachments = { mImageViews[i], m_depthImageView };
 
 		VkFramebufferCreateInfo framebufferInfo = {};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -566,60 +565,43 @@ void GraphicsContext::createFramebuffers()
 	}
 }
 
-void GraphicsContext::createImageFromSurface(SDL_Surface *pSurface, VkImage *pImageOut, VkDeviceMemory *pImageMemoryOut)
+void GraphicsContext::createImageFromSurface(SDL_Surface *pSurface, GpuImage *pImageOut)
 {
 	VkResult result = VK_SUCCESS;
 
 	SDL_Surface *pImageSurface = SDL_ConvertSurfaceFormat(pSurface, SDL_PIXELFORMAT_ABGR8888, 0);
 	U32 imageSize = pImageSurface->w * pImageSurface->h * pImageSurface->format->BytesPerPixel;
 
-	VkImage stagingImage;
-	VkDeviceMemory stagingImageMemory;
+	GpuImage stagingImage;
 	createImage(pImageSurface->w, pImageSurface->h, VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_TILING_LINEAR,
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&stagingImage, &stagingImageMemory);
+		&stagingImage);
 
 	void *data;
-	vkMapMemory(mDevice, stagingImageMemory, 0, imageSize, 0, &data);
+	vkMapMemory(mDevice, stagingImage.allocation->heapMemory, stagingImage.allocation->heapOffset, imageSize, 0, &data);
 	memcpy(data, pImageSurface->pixels, imageSize);
-	vkUnmapMemory(mDevice, stagingImageMemory);
+	vkUnmapMemory(mDevice, stagingImage.allocation->heapMemory);
 
 	createImage(pImageSurface->w, pImageSurface->h, VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		pImageOut, pImageMemoryOut);
+		pImageOut);
 
 	VkCommandBuffer commandBuffer = beginSingleUseCommandBuffer();
-	setImageLayout(commandBuffer, stagingImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	setImageLayout(commandBuffer, *pImageOut, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	copyImage(commandBuffer, stagingImage, *pImageOut, pImageSurface->w, pImageSurface->h);
-	setImageLayout(commandBuffer, *pImageOut, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	setImageLayout(commandBuffer, stagingImage.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	setImageLayout(commandBuffer, pImageOut->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	copyImage(commandBuffer, stagingImage.image, pImageOut->image, pImageSurface->w, pImageSurface->h);
+	setImageLayout(commandBuffer, pImageOut->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	endSingleUseCommandBuffer(commandBuffer);
 
-	vkFreeMemory(mDevice, stagingImageMemory, nullptr);
-	vkDestroyImage(mDevice, stagingImage, nullptr);
+	m_stagingGraphicsMemory->free(stagingImage.allocation);
+	vkDestroyImage(mDevice, stagingImage.image, nullptr);
 
 	SDL_FreeSurface(pImageSurface);
 	pImageSurface = nullptr;
-}
-
-void GraphicsContext::createTextureImage()
-{
-	VkResult result = VK_SUCCESS;
-
-	SDL_Surface *surface = IMG_Load("../data/textures/guard1_body.tga");
-	
-	createImageFromSurface(surface, &mTextureImage, &mTextureImageMemory);
-
-	SDL_FreeSurface(surface);
-}
-
-void GraphicsContext::createTextureImageView()
-{
-	createImageView(mTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, &mTextureImageView);
 }
 
 void GraphicsContext::createTextureSampler()
@@ -743,54 +725,6 @@ void GraphicsContext::createDescriptorPool()
 	assert(checkResult(result));
 }
 
-void GraphicsContext::createDescriptorSet()
-{
-	VkResult result = VK_SUCCESS;
-
-	VkDescriptorSetLayout layouts[] = { mDescriptorSetLayout };
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = mDescriptorPool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = layouts;
-
-	result = vkAllocateDescriptorSets(mDevice, &allocInfo, &mDescriptorSet);
-	assert(checkResult(result));
-
-	VkDescriptorBufferInfo bufferInfo = {};
-	bufferInfo.buffer = mUniformBuffer;
-	bufferInfo.offset = 0;
-	bufferInfo.range = sizeof(SceneConstantBuffer);
-
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = mTextureImageView;
-	imageInfo.sampler = mTextureSampler;
-
-	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[0].dstSet = mDescriptorSet;
-	descriptorWrites[0].dstBinding = 0;
-	descriptorWrites[0].dstArrayElement = 0;
-	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorWrites[0].descriptorCount = 1;
-	descriptorWrites[0].pBufferInfo = &bufferInfo;
-	descriptorWrites[0].pImageInfo = nullptr;
-	descriptorWrites[0].pTexelBufferView = nullptr;
-
-	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[1].dstSet = mDescriptorSet;
-	descriptorWrites[1].dstBinding = 1;
-	descriptorWrites[1].dstArrayElement = 0;
-	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrites[1].descriptorCount = 1;
-	descriptorWrites[1].pBufferInfo = nullptr;
-	descriptorWrites[1].pImageInfo = &imageInfo;
-	descriptorWrites[1].pTexelBufferView = nullptr;
-
-	vkUpdateDescriptorSets(mDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
-}
-
 void GraphicsContext::createCommandBuffers()
 {
 	VkResult result = VK_SUCCESS;
@@ -863,9 +797,9 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 			&subMesh.indexBuffer, &subMesh.indexBufferMemory);
 		
 		SDL_Surface *pImageSurface = IMG_Load(subMesh.textureName.c_str());
-		createImageFromSurface(pImageSurface, &subMesh.textureImage, &subMesh.textureImageMemory);
+		createImageFromSurface(pImageSurface, &subMesh.textureImage);
 		SDL_FreeSurface(pImageSurface);
-		createImageView(subMesh.textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, &subMesh.textureImageView);
+		createImageView(subMesh.textureImage.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, &subMesh.textureImageView);
 		
 		//Create descriptor set
 		VkDescriptorSetLayout layouts[] = { mDescriptorSetLayout };
@@ -1117,7 +1051,7 @@ void GraphicsContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 }
 
 void GraphicsContext::createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-	VkImage *image, VkDeviceMemory *imageMemory)
+	GpuImage *pImageOut)
 {
 	VkResult result = VK_SUCCESS;
 
@@ -1136,21 +1070,22 @@ void GraphicsContext::createImage(U32 width, U32 height, VkFormat format, VkImag
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.flags = 0;
-	result = vkCreateImage(mDevice, &imageInfo, nullptr, image);
+	result = vkCreateImage(mDevice, &imageInfo, nullptr, &pImageOut->image);
 	assert(checkResult(result));
 
 	VkMemoryRequirements memReq;
-	vkGetImageMemoryRequirements(mDevice, *image, &memReq);
+	vkGetImageMemoryRequirements(mDevice, pImageOut->image, &memReq);
 
-	VkMemoryAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memReq.size;
-	allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, properties);
+	if (properties == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+	{
+		pImageOut->allocation = m_graphicsMemory->alloc(memReq);
+	}
+	else if (properties == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+	{
+		pImageOut->allocation = m_stagingGraphicsMemory->alloc(memReq);
+	}
 
-	result = vkAllocateMemory(mDevice, &allocInfo, nullptr, imageMemory);
-	assert(checkResult(result));
-
-	vkBindImageMemory(mDevice, *image, *imageMemory, 0);
+	vkBindImageMemory(mDevice, pImageOut->image, pImageOut->allocation->heapMemory, pImageOut->allocation->heapOffset);
 }
 
 void GraphicsContext::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView *pImageViewOut)

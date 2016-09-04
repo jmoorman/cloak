@@ -9,8 +9,8 @@
 #include "Mesh.h"
 
 static Mesh *g_pyramidMesh = nullptr;
-#define BOB_ROWS 10
-#define BOB_COLS 10
+#define BOB_ROWS 3
+#define BOB_COLS 3
 #define BOB_COUNT (BOB_ROWS * BOB_COLS)
 static AnimatedMesh *g_bobLampArray[BOB_COUNT];
 

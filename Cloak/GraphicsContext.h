@@ -8,7 +8,8 @@
 #include "stdafx.h"
 
 #include "AnimatedMesh.h"
-#include "GraphicsMemoryHeap.h"
+#include "GpuMemoryHeap.h"
+#include "graphics_resources.h"
 
 #ifdef NDEBUG
 const bool gEnableValidationLayers = false;
@@ -52,17 +53,15 @@ private:
 	std::vector<VkImageView> mImageViews;
 	std::vector<VkFramebuffer> mSwapchainFramebuffers;
 	
-	VkImage mDepthImage;
-	VkDeviceMemory mDepthImageMemory;
-	VkImageView mDepthImageView;
-	VkFormat mDepthFormat;
+	GpuImage m_depthImage;
+	VkImageView m_depthImageView;
+	VkFormat m_depthFormat;
 
 	VkRenderPass mRenderPass;
 	VkDescriptorSetLayout mDescriptorSetLayout;
 	VkPipelineLayout mPipelineLayout;
 	VkPipeline mPipeline;
 	VkDescriptorPool mDescriptorPool;
-	VkDescriptorSet mDescriptorSet;
 	VkCommandPool mCommandPool;
 	std::vector<VkCommandBuffer> mCommandBuffers;
 	std::vector<VkCommandBuffer> mSecondaryCommandBuffers;
@@ -77,12 +76,11 @@ private:
 	VkDeviceMemory mUniformStagingBufferMemory;
 	VkBuffer mUniformBuffer;
 	VkDeviceMemory mUniformBufferMemory;
-	VkImage mTextureImage;
-	VkDeviceMemory mTextureImageMemory;
-	VkImageView mTextureImageView;
+
 	VkSampler mTextureSampler;
 
-	GraphicsMemoryHeap *mGraphicsMemory;
+	GpuMemoryHeap *m_graphicsMemory;
+	GpuMemoryHeap *m_stagingGraphicsMemory;
 
 	U32 mFrameCount;
 
@@ -100,25 +98,22 @@ private:
 	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
 	void createFramebuffers();
-	void createTextureImage();
-	void createTextureImageView();
 	void createTextureSampler();
 	void createVertexBuffer();
 	void createIndexBuffer();
 	void createUniformBuffer();
 	void createDescriptorPool();
-	void createDescriptorSet();
 	void createCommandBuffers();
 	void createSemaphores();
 
-	void createImageFromSurface(SDL_Surface *pSurface, VkImage *pImageOut, VkDeviceMemory *pImageMemoryOut);
+	void createImageFromSurface(SDL_Surface *pSurface, GpuImage *pImageOut);
 	void createBufferFromData(void *pData, U32 bufferSize, VkBufferUsageFlags usage, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
 
 	//Utility functions
 	bool checkValidationLayerSupport(const std::vector<const char *> &validationLayers);
 	void createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule);
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
-	void createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage * image, VkDeviceMemory * imageMemory);
+	void createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, GpuImage *pImageOut);
 	void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView * pImageViewOut);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void copyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImage dstImage, U32 width, U32 height);

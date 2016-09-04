@@ -5,6 +5,7 @@
 #include "Animation.h"
 #include "DrawableObject.h"
 #include "geometry.h"
+#include "graphics_resources.h"
 
 struct AnimatedSubMesh {
 	std::vector<AnimatedMeshVertex> vertices;
@@ -21,8 +22,7 @@ struct AnimatedSubMesh {
 	VkBuffer constantBuffer;
 	VkDeviceMemory constantBufferMemory;
 
-	VkImage textureImage;
-	VkDeviceMemory textureImageMemory;
+	GpuImage textureImage;
 	VkImageView textureImageView;
 	VkSampler textureSampler;
 
