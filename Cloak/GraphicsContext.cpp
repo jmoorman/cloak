@@ -3,6 +3,10 @@
 #include "geometry.h"
 #include "CloakUtils.h"
 
+#define VMA_DEBUG_PRINT 0
+#define VMA_IMPLEMENTATION
+#include "vk_mem_alloc.h"
+
 #define VK_CALL(func_call) { \
 	result = func_call; \
 	if(result != VK_SUCCESS) \
@@ -36,7 +40,7 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	setupDebugCallback();
 	selectPhysicalDevice();
 	createLogicalDevice();
-	createMemoryHeaps();
+	createMemoryAllocator();
 	createSurface(hinstance, hwnd);
 	createSwapchain();
 	createImageViews();
@@ -46,10 +50,8 @@ void GraphicsContext::init(HINSTANCE hinstance, HWND hwnd)
 	createGraphicsPipeline();
 	createFramebuffers();
 	createTextureSampler();
-	createVertexBuffer();
 	createUniformBuffer();
 	createDescriptorPool();
-	createIndexBuffer();
 	createCommandBuffers();
 	createSemaphores();
 }
@@ -70,8 +72,6 @@ void GraphicsContext::createInstance()
 	
 	VkInstanceCreateInfo instanceInfo = {};
 	instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	instanceInfo.enabledExtensionCount = 0;
-	instanceInfo.ppEnabledExtensionNames = nullptr;
 	
 	const std::vector<const char *> validationLayers = { "VK_LAYER_LUNARG_standard_validation" };
 	const std::vector<const char *> enabledExtensions = { "VK_KHR_surface", "VK_KHR_win32_surface", "VK_EXT_debug_report" };
@@ -182,10 +182,13 @@ void GraphicsContext::createLogicalDevice()
 	assert(checkResult(result));
 }
 
-void GraphicsContext::createMemoryHeaps()
+void GraphicsContext::createMemoryAllocator()
 {
-	m_graphicsMemory = new GpuMemoryHeap(mPhysicalDevice, mDevice, 1024 * 1024 * 100, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); //100 MB
-	m_stagingGraphicsMemory = new GpuMemoryHeap(mPhysicalDevice, mDevice, 1024 * 1024 * 100, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); //100 MB
+	VmaAllocatorCreateInfo allocatorInfo = {};
+	allocatorInfo.physicalDevice = mPhysicalDevice;
+	allocatorInfo.device = mDevice;
+
+	vmaCreateAllocator(&allocatorInfo, &mAllocator);
 }
 
 void GraphicsContext::createSurface(HINSTANCE hinstance, HWND hwnd)
@@ -580,9 +583,9 @@ void GraphicsContext::createImageFromSurface(SDL_Surface *pSurface, GpuImage *pI
 		&stagingImage);
 
 	void *data;
-	vkMapMemory(mDevice, stagingImage.allocation->heapMemory, stagingImage.allocation->heapOffset, imageSize, 0, &data);
+	vmaMapMemory(mAllocator, stagingImage.allocation, &data);
 	memcpy(data, pImageSurface->pixels, imageSize);
-	vkUnmapMemory(mDevice, stagingImage.allocation->heapMemory);
+	vmaUnmapMemory(mAllocator, stagingImage.allocation);
 
 	createImage(pImageSurface->w, pImageSurface->h, VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_TILING_OPTIMAL,
@@ -597,8 +600,7 @@ void GraphicsContext::createImageFromSurface(SDL_Surface *pSurface, GpuImage *pI
 	setImageLayout(commandBuffer, pImageOut->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	endSingleUseCommandBuffer(commandBuffer);
 
-	m_stagingGraphicsMemory->free(stagingImage.allocation);
-	vkDestroyImage(mDevice, stagingImage.image, nullptr);
+	vmaDestroyImage(mAllocator, stagingImage.image, stagingImage.allocation);
 
 	SDL_FreeSurface(pImageSurface);
 	pImageSurface = nullptr;
@@ -629,80 +631,34 @@ void GraphicsContext::createTextureSampler()
 	assert(checkResult(result));
 }
 
-void GraphicsContext::createBufferFromData(void *pData, U32 bufferSize, VkBufferUsageFlags usage, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut)
+void GraphicsContext::createBufferFromData(void *pData, U32 bufferSize, VkBufferUsageFlags usage, GpuBuffer *pBufferOut)
 {
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
+	GpuBuffer stagingBuffer;
 	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&stagingBuffer, &stagingBufferMemory);
+		&stagingBuffer);
 
 	void *pStagingData;
-	vkMapMemory(mDevice, stagingBufferMemory, 0, bufferSize, 0, &pStagingData);
+	vmaMapMemory(mAllocator, stagingBuffer.allocation, &pStagingData);
 	memcpy(pStagingData, pData, bufferSize);
-	vkUnmapMemory(mDevice, stagingBufferMemory);
+	vmaUnmapMemory(mAllocator, stagingBuffer.allocation);
 
 	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, pBufferOut, pBufferMemoryOut);
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, pBufferOut);
 
-	copyBuffer(stagingBuffer, *pBufferOut, bufferSize);
+	copyBuffer(stagingBuffer.buffer, pBufferOut->buffer, bufferSize);
 
-	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
-	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
-}
-
-void GraphicsContext::createVertexBuffer()
-{
-	U32 bufferSize = sizeof(gDemoVertices[0]) * gDemoVertices.size();
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&stagingBuffer, &stagingBufferMemory);
-
-	void *data;
-	vkMapMemory(mDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, gDemoVertices.data(), bufferSize);
-	vkUnmapMemory(mDevice, stagingBufferMemory);
-
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mVertexBuffer, &mVertexBufferMemory);
-
-	copyBuffer(stagingBuffer, mVertexBuffer, bufferSize);
-
-	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
-	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
-}
-
-void GraphicsContext::createIndexBuffer()
-{
-	U32 bufferSize = sizeof(gDemoIndices[0]) * gDemoIndices.size();
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&stagingBuffer, &stagingBufferMemory);
-
-	void *data;
-	vkMapMemory(mDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, gDemoIndices.data(), bufferSize);
-	vkUnmapMemory(mDevice, stagingBufferMemory);
-
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mIndexBuffer, &mIndexBufferMemory);
-
-	copyBuffer(stagingBuffer, mIndexBuffer, bufferSize);
-
-	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
-	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
+	vmaDestroyBuffer(mAllocator, stagingBuffer.buffer, stagingBuffer.allocation);
 }
 
 void GraphicsContext::createUniformBuffer()
 {
 	//make the staging buffer the size of the largest constant buffer for now so it can be used for any buffer
-	createBuffer(sizeof(AnimationConstantBuffer), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&mUniformStagingBuffer, &mUniformStagingBufferMemory);
-	createBuffer(sizeof(SceneConstantBuffer), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		&mUniformBuffer, &mUniformBufferMemory);
+	createBuffer(sizeof(AnimationConstantBuffer), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&m_uniformStagingBuffer);
+	createBuffer(sizeof(SceneConstantBuffer), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		&m_uniformBuffer);
 }
 
 void GraphicsContext::createDescriptorPool()
@@ -763,7 +719,7 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 	allocInfo.commandBufferCount = 1;
 
-	result = vkAllocateCommandBuffers(mDevice, &allocInfo, &animatedMesh->mCommandBuffer);
+	result = vkAllocateCommandBuffers(mDevice, &allocInfo, &animatedMesh->m_commandBuffer);
 	assert(checkResult(result));
 	
 	VkCommandBufferInheritanceInfo inheritanceInfo = {};
@@ -776,25 +732,24 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	beginInfo.pInheritanceInfo = &inheritanceInfo;
-	vkBeginCommandBuffer(animatedMesh->mCommandBuffer, &beginInfo);
+	vkBeginCommandBuffer(animatedMesh->m_commandBuffer, &beginInfo);
 
 	ObjectConstantBuffer objectBuffer = {};
 	objectBuffer.modelMatrix = animatedMesh->buildModelMatrix();
-	createBufferFromData(&objectBuffer, sizeof(objectBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		&animatedMesh->mObjectConstantBuffer, &animatedMesh->mObjectConstantBufferMemory);
+	createBufferFromData(&objectBuffer, sizeof(objectBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &animatedMesh->m_objectConstantBuffer);
 
 	auto &boneMatrices = animatedMesh->getBoneMatrices();
 	createBufferFromData(boneMatrices.data(), sizeof(boneMatrices[0]) * boneMatrices.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		&animatedMesh->mAnimationConstantBuffer, &animatedMesh->mAnimationConstantBufferMemory);
+		&animatedMesh->m_animationConstantBuffer);
 	
 	for (AnimatedSubMesh &subMesh : animatedMesh->getSubMeshes())
 	{
 		//Create resources in GPU memory
 		createBufferFromData(subMesh.vertices.data(), sizeof(subMesh.vertices[0]) * subMesh.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			&subMesh.vertexBuffer, &subMesh.vertexBufferMemory);
+			&subMesh.vertexBuffer);
 		
 		createBufferFromData(subMesh.indices.data(), sizeof(subMesh.indices[0]) * subMesh.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			&subMesh.indexBuffer, &subMesh.indexBufferMemory);
+			&subMesh.indexBuffer);
 		
 		SDL_Surface *pImageSurface = IMG_Load(subMesh.textureName.c_str());
 		createImageFromSurface(pImageSurface, &subMesh.textureImage);
@@ -813,17 +768,17 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		assert(checkResult(result));
 
 		VkDescriptorBufferInfo bufferInfo = {};
-		bufferInfo.buffer = mUniformBuffer;
+		bufferInfo.buffer = m_uniformBuffer.buffer;
 		bufferInfo.offset = 0;
 		bufferInfo.range = sizeof(SceneConstantBuffer);
 
 		VkDescriptorBufferInfo objectBufferInfo = {};
-		objectBufferInfo.buffer = animatedMesh->mObjectConstantBuffer;
+		objectBufferInfo.buffer = animatedMesh->m_objectConstantBuffer.buffer;
 		objectBufferInfo.offset = 0;
 		objectBufferInfo.range = sizeof(ObjectConstantBuffer);
 
 		VkDescriptorBufferInfo animationBufferInfo = {};
-		animationBufferInfo.buffer = animatedMesh->mAnimationConstantBuffer;
+		animationBufferInfo.buffer = animatedMesh->m_animationConstantBuffer.buffer;
 		animationBufferInfo.offset = 0;
 		animationBufferInfo.range = sizeof(AnimationConstantBuffer);
 
@@ -876,32 +831,32 @@ void GraphicsContext::createCommandBuffer(AnimatedMesh *animatedMesh)
 		vkUpdateDescriptorSets(mDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 
 		//Record commands
-		vkCmdBindPipeline(animatedMesh->mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
-		VkBuffer vertexBuffers[] = { subMesh.vertexBuffer };
+		vkCmdBindPipeline(animatedMesh->m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+		VkBuffer vertexBuffers[] = { subMesh.vertexBuffer.buffer };
 		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(animatedMesh->mCommandBuffer, 0, 1, vertexBuffers, offsets);
-		vkCmdBindIndexBuffer(animatedMesh->mCommandBuffer, subMesh.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-		vkCmdBindDescriptorSets(animatedMesh->mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &subMesh.descriptorSet, 0, nullptr);
-		vkCmdDrawIndexed(animatedMesh->mCommandBuffer, subMesh.indices.size(), 1, 0, 0, 0);
+		vkCmdBindVertexBuffers(animatedMesh->m_commandBuffer, 0, 1, vertexBuffers, offsets);
+		vkCmdBindIndexBuffer(animatedMesh->m_commandBuffer, subMesh.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindDescriptorSets(animatedMesh->m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0, 1, &subMesh.descriptorSet, 0, nullptr);
+		vkCmdDrawIndexed(animatedMesh->m_commandBuffer, subMesh.indices.size(), 1, 0, 0, 0);
 	}
 
-	vkEndCommandBuffer(animatedMesh->mCommandBuffer);
+	vkEndCommandBuffer(animatedMesh->m_commandBuffer);
 
-	mSecondaryCommandBuffers.push_back(animatedMesh->mCommandBuffer);
+	mSecondaryCommandBuffers.push_back(animatedMesh->m_commandBuffer);
 }
 
 void GraphicsContext::updateConstantBuffer(const void * pData, U32 bufferSize, VkBuffer buffer)
 {
 	void *data;
-	vkMapMemory(mDevice, mUniformStagingBufferMemory, 0, bufferSize, 0, &data);
+	vmaMapMemory(mAllocator, m_uniformStagingBuffer.allocation, &data);
 	memcpy(data, pData, bufferSize);
-	vkUnmapMemory(mDevice, mUniformStagingBufferMemory);
-	copyBuffer(mUniformStagingBuffer, buffer, bufferSize);
+	vmaUnmapMemory(mAllocator, m_uniformStagingBuffer.allocation);
+	copyBuffer(m_uniformStagingBuffer.buffer, buffer, bufferSize);
 }
 
 void GraphicsContext::updateSceneConstantBuffer(const SceneConstantBuffer &sceneConstantBuffer)
 {
-	updateConstantBuffer(&sceneConstantBuffer, sizeof(sceneConstantBuffer), mUniformBuffer);
+	updateConstantBuffer(&sceneConstantBuffer, sizeof(sceneConstantBuffer), m_uniformBuffer.buffer);
 }
 
 void GraphicsContext::drawFrame()
@@ -1021,7 +976,7 @@ void GraphicsContext::createShaderModule(const std::vector<char>& code, VkShader
 	assert(checkResult(result));
 }
 
-void GraphicsContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut)
+void GraphicsContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, GpuBuffer *pBufferOut)
 {
 	VkResult result = VK_SUCCESS;
 
@@ -1031,23 +986,18 @@ void GraphicsContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
 	bufferInfo.usage = usage;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	result = vkCreateBuffer(mDevice, &bufferInfo, nullptr, pBufferOut);
+	VmaMemoryRequirements vmaReq = {};
+	if (properties == VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+	{
+		vmaReq.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	}
+	else if (properties == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+	{
+		vmaReq.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+	}
+
+	result = vmaCreateBuffer(mAllocator, &bufferInfo, &vmaReq, &pBufferOut->buffer, &pBufferOut->allocation, &pBufferOut->allocationInfo);
 	assert(checkResult(result));
-
-	VkMemoryRequirements memReq;
-	vkGetBufferMemoryRequirements(mDevice, *pBufferOut, &memReq);
-
-	VkMemoryAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memReq.size;
-	allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, properties);
-
-	//This is bad practice. We should be allocating a large block up-front and managing our own suballocations
-	result = vkAllocateMemory(mDevice, &allocInfo, nullptr, pBufferMemoryOut);
-	assert(checkResult(result));
-	//const GraphicsAllocation &allocation = mGraphicsMemory->alloc(memReq);
-
-	vkBindBufferMemory(mDevice, *pBufferOut, *pBufferMemoryOut, 0);
 }
 
 void GraphicsContext::createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
@@ -1070,22 +1020,19 @@ void GraphicsContext::createImage(U32 width, U32 height, VkFormat format, VkImag
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.flags = 0;
-	result = vkCreateImage(mDevice, &imageInfo, nullptr, &pImageOut->image);
-	assert(checkResult(result));
 
-	VkMemoryRequirements memReq;
-	vkGetImageMemoryRequirements(mDevice, pImageOut->image, &memReq);
-
+	VmaMemoryRequirements vmaReq = {};
 	if (properties == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 	{
-		pImageOut->allocation = m_graphicsMemory->alloc(memReq);
+		vmaReq.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 	}
 	else if (properties == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 	{
-		pImageOut->allocation = m_stagingGraphicsMemory->alloc(memReq);
+		vmaReq.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 	}
 
-	vkBindImageMemory(mDevice, pImageOut->image, pImageOut->allocation->heapMemory, pImageOut->allocation->heapOffset);
+	result = vmaCreateImage(mAllocator, &imageInfo, &vmaReq, &pImageOut->image, &pImageOut->allocation, &pImageOut->allocationInfo);
+	assert(checkResult(result));
 }
 
 void GraphicsContext::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView *pImageViewOut)
@@ -1160,6 +1107,8 @@ void GraphicsContext::destroy()
 	auto pfnDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(mInstance,
 		"vkDestroyDebugReportCallbackEXT");
 	pfnDestroyDebugReportCallbackEXT(mInstance, mDebugCallback, nullptr);
+
+	vmaDestroyAllocator(mAllocator);
 
 	vkDestroyInstance(mInstance, nullptr);
 }

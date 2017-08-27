@@ -1,14 +1,8 @@
 #pragma once
 
-//This define needs to be included before we include vulkan.h
-#define VK_USE_PLATFORM_WIN32_KHR
-
-#include <vulkan.h>
-
 #include "stdafx.h"
 
 #include "AnimatedMesh.h"
-#include "GpuMemoryHeap.h"
 #include "graphics_resources.h"
 
 #ifdef NDEBUG
@@ -45,6 +39,8 @@ private:
 	VkQueue mQueue;
 	U32 mQueueFamilyIndex;
 
+	VmaAllocator mAllocator;
+
 	VkSurfaceKHR mSurface;
 	VkSurfaceFormatKHR mSurfaceFormat;
 
@@ -68,19 +64,12 @@ private:
 	VkSemaphore imageAcquiredSemaphore;
 	VkSemaphore renderFinishedSemaphore;
 
-	VkBuffer mVertexBuffer;
-	VkDeviceMemory mVertexBufferMemory;
-	VkBuffer mIndexBuffer;
-	VkDeviceMemory mIndexBufferMemory;
-	VkBuffer mUniformStagingBuffer;
-	VkDeviceMemory mUniformStagingBufferMemory;
-	VkBuffer mUniformBuffer;
-	VkDeviceMemory mUniformBufferMemory;
+	GpuBuffer m_uniformStagingBuffer;
+	GpuBuffer m_uniformBuffer;
 
 	VkSampler mTextureSampler;
 
-	GpuMemoryHeap *m_graphicsMemory;
-	GpuMemoryHeap *m_stagingGraphicsMemory;
+private:
 
 	U32 mFrameCount;
 
@@ -90,7 +79,7 @@ private:
 	void createSurface(HINSTANCE hinstance, HWND hwnd);
 	void selectPhysicalDevice();
 	void createLogicalDevice();
-	void createMemoryHeaps();
+	void createMemoryAllocator();
 	void createSwapchain();
 	void createImageViews();
 	void createDepthResources();
@@ -99,20 +88,18 @@ private:
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createTextureSampler();
-	void createVertexBuffer();
-	void createIndexBuffer();
 	void createUniformBuffer();
 	void createDescriptorPool();
 	void createCommandBuffers();
 	void createSemaphores();
 
 	void createImageFromSurface(SDL_Surface *pSurface, GpuImage *pImageOut);
-	void createBufferFromData(void *pData, U32 bufferSize, VkBufferUsageFlags usage, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
+	void createBufferFromData(void *pData, U32 bufferSize, VkBufferUsageFlags usage, GpuBuffer *pBufferOut);
 
 	//Utility functions
 	bool checkValidationLayerSupport(const std::vector<const char *> &validationLayers);
 	void createShaderModule(const std::vector<char>& code, VkShaderModule *pShaderModule);
-	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *pBufferOut, VkDeviceMemory *pBufferMemoryOut);
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, GpuBuffer *pBufferOut);
 	void createImage(U32 width, U32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, GpuImage *pImageOut);
 	void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView * pImageViewOut);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);

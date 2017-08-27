@@ -71,8 +71,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\VulkanSDK\1.0.5.0\Include\vulkan;$(SolutionDir)3rdparty\SDL2-2.0.3\include;$(SolutionDir)3rdparty\SDL2_image-2.0.0\include;$(SolutionDir)3rdparty\glm-0.9.7.1\;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\VulkanSDK\1.0.5.0\Bin32;$(SolutionDir)3rdparty\SDL2-2.0.3\lib\x86;$(SolutionDir)3rdparty\SDL2_image-2.0.0\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\VulkanSDK\1.0.54.0\Include\vulkan;$(SolutionDir)3rdparty\SDL2-2.0.3\include;$(SolutionDir)3rdparty\SDL2_image-2.0.0\include;$(SolutionDir)3rdparty\glm-0.9.7.1\;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\VulkanSDK\1.0.54.0\Lib32;$(SolutionDir)3rdparty\SDL2-2.0.3\lib\x86;$(SolutionDir)3rdparty\SDL2_image-2.0.0\lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -81,8 +81,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\VulkanSDK\1.0.5.0\Include\vulkan;$(SolutionDir)3rdparty\SDL2-2.0.3\include;$(SolutionDir)3rdparty\SDL2_image-2.0.0\include;$(SolutionDir)3rdparty\glm-0.9.7.1\;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\VulkanSDK\1.0.5.0\Bin32;$(SolutionDir)3rdparty\SDL2-2.0.3\lib\x86;$(SolutionDir)3rdparty\SDL2_image-2.0.0\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\VulkanSDK\1.0.54.0\Include\vulkan;$(SolutionDir)3rdparty\SDL2-2.0.3\include;$(SolutionDir)3rdparty\SDL2_image-2.0.0\include;$(SolutionDir)3rdparty\glm-0.9.7.1\;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\VulkanSDK\1.0.54.0\Lib32;$(SolutionDir)3rdparty\SDL2-2.0.3\lib\x86;$(SolutionDir)3rdparty\SDL2_image-2.0.0\lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -164,7 +164,6 @@
     <ClInclude Include="geometry.h" />
     <ClInclude Include="graphics_resources.h" />
     <ClInclude Include="GraphicsContext.h" />
-    <ClInclude Include="GpuMemoryHeap.h" />
     <ClInclude Include="GraphicsObject.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="CloakUtils.h" />
@@ -173,6 +172,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TextureCache.h" />
     <ClInclude Include="types.h" />
+    <ClInclude Include="vk_mem_alloc.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnimatedMesh.cpp" />
@@ -181,7 +181,6 @@
     <ClCompile Include="Cloak.cpp" />
     <ClCompile Include="DrawableObject.cpp" />
     <ClCompile Include="GraphicsContext.cpp" />
-    <ClCompile Include="GpuMemoryHeap.cpp" />
     <ClCompile Include="GraphicsObject.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="CloakUtils.cpp" />

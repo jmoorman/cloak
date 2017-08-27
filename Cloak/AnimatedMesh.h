@@ -13,14 +13,9 @@ struct AnimatedSubMesh {
 	std::string textureName;
 
 	//Vulkan handles
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vertexBufferMemory;
-
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexBufferMemory;
-
-	VkBuffer constantBuffer;
-	VkDeviceMemory constantBufferMemory;
+	GpuBuffer vertexBuffer;
+	GpuBuffer indexBuffer;
+	GpuBuffer constantBuffer;
 
 	GpuImage textureImage;
 	VkImageView textureImageView;
@@ -42,8 +37,8 @@ public:
 	std::vector<AnimatedSubMesh>& getSubMeshes();
 	std::vector<glm::mat4>& getBoneMatrices();
 
-	VkBuffer mAnimationConstantBuffer;
-	VkDeviceMemory mAnimationConstantBufferMemory;
+	GpuBuffer m_animationConstantBuffer;
+
 private:
 
 	struct Bone {

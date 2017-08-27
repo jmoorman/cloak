@@ -9,8 +9,8 @@
 #include "Mesh.h"
 
 static Mesh *g_pyramidMesh = nullptr;
-#define BOB_ROWS 3
-#define BOB_COLS 3
+#define BOB_ROWS 10
+#define BOB_COLS 10
 #define BOB_COUNT (BOB_ROWS * BOB_COLS)
 static AnimatedMesh *g_bobLampArray[BOB_COUNT];
 
@@ -109,14 +109,14 @@ int main()
 		{
 			AnimatedMesh *bob = g_bobLampArray[i];
 			bob->update(elapsedMillis);
-			graphicsContext.updateConstantBuffer((void *)&bob->buildModelMatrix(), sizeof(ObjectConstantBuffer), bob->mObjectConstantBuffer);
-			graphicsContext.updateConstantBuffer(bob->getBoneMatrices().data(), bob->getBoneMatrices().size() * sizeof(glm::mat4), bob->mAnimationConstantBuffer);
+			graphicsContext.updateConstantBuffer((void *)&bob->buildModelMatrix(), sizeof(ObjectConstantBuffer), bob->m_objectConstantBuffer.buffer);
+			graphicsContext.updateConstantBuffer(bob->getBoneMatrices().data(), bob->getBoneMatrices().size() * sizeof(glm::mat4), bob->m_animationConstantBuffer.buffer);
 		}
 
 		graphicsContext.drawFrame();
 
 		lastFrameTime = currentFrameTime;
-		Sleep(1); //remove this once we actually have some frame time
+		//Sleep(1); //remove this once we actually have some frame time
 	}
 	graphicsContext.destroy();
 	SDL_DestroyWindow(window);

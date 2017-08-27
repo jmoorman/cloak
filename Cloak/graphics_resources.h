@@ -2,16 +2,20 @@
 
 #include "stdafx.h"
 
-#include "GpuMemoryHeap.h"
-
 struct GpuBuffer
 {
+	GpuBuffer() : buffer(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE) {}
+
 	VkBuffer buffer;
-	GpuAllocation *memory;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocationInfo;
 };
 
 struct GpuImage
 {
+	GpuImage() : image(VK_NULL_HANDLE), allocation(VK_NULL_HANDLE) {}
+
 	VkImage image;
-	const GpuAllocation *allocation;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocationInfo;
 };

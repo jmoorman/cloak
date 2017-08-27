@@ -2,6 +2,8 @@
 
 #include "stdafx.h"
 
+#include "graphics_resources.h"
+
 class DrawableObject
 {
 	friend class GraphicsContext;
@@ -32,8 +34,7 @@ public:
 
 	glm::mat4 buildModelMatrix();
 
-	VkBuffer mObjectConstantBuffer;
-	VkDeviceMemory mObjectConstantBufferMemory;
+	GpuBuffer m_objectConstantBuffer;
 
 protected:
 	DrawableType mType;
@@ -41,6 +42,6 @@ protected:
 	glm::quat mOrientation;
 	glm::vec3 mScale;
 
-	VkCommandBuffer mCommandBuffer;
+	VkCommandBuffer m_commandBuffer;
 };
 

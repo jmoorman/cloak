@@ -5,9 +5,7 @@
 DrawableObject::DrawableObject(DrawableType type)
 	: mType(type), mPosition(0, 0, 0), mOrientation(0, 0, 0, 1)
 {
-	mObjectConstantBuffer = VK_NULL_HANDLE;
-	mObjectConstantBufferMemory = VK_NULL_HANDLE;
-	mCommandBuffer = VK_NULL_HANDLE;
+	m_commandBuffer = VK_NULL_HANDLE;
 }
 
 

@@ -34,5 +34,6 @@
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan.h>
+#include "vk_mem_alloc.h"
 
 #include "types.h"
